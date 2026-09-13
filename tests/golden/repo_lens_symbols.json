@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "count": 11,
+  "symbols": {
+    "/list": [
+      {
+        "file": "plugins/demo/routes.py",
+        "line": 9,
+        "kind": "route",
+        "owner": "demo"
+      }
+    ],
+    "/ping": [
+      {
+        "file": "plugins/demo/routes.py",
+        "line": 5,
+        "kind": "route",
+        "owner": "demo"
+      }
+    ],
+    "BadPlugin": [
+      {
+        "file": "plugins/bad/__init__.py",
+        "line": 1,
+        "kind": "class",
+        "owner": "bad"
+      }
+    ],
+    "BasePlugin": [
+      {
+        "file": "plugin_manager/base.py",
+        "line": 7,
+        "kind": "class",
+        "owner": "plugin_manager"
+      }
+    ],
+    "DemoPlugin": [
+      {
+        "file": "plugins/demo/__init__.py",
+        "line": 3,
+        "kind": "class",
+        "owner": "demo"
+      }
+    ],
+    "PluginManager": [
+      {
+        "file": "plugin_manager/manager.py",
+        "line": 3,
+        "kind": "class",
+        "owner": "plugin_manager"
+      }
+    ],
+    "_": [
+      {
+        "file": "i18n/__init__.py",
+        "line": 1,
+        "kind": "function",
+        "owner": "i18n"
+      }
+    ],
+    "get_pooled_connection": [
+      {
+        "file": "plugins/_base/db.py",
+        "line": 1,
+        "kind": "function",
+        "owner": "_base"
+      }
+    ],
+    "list_items": [
+      {
+        "file": "plugins/demo/routes.py",
+        "line": 9,
+        "kind": "function",
+        "owner": "demo"
+      }
+    ],
+    "ping": [
+      {
+        "file": "plugins/demo/routes.py",
+        "line": 5,
+        "kind": "function",
+        "owner": "demo"
+      }
+    ],
+    "pooled": [
+      {
+        "file": "shared/__init__.py",
+        "line": 1,
+        "kind": "function",
+        "owner": "shared"
+      }
+    ]
+  }
+}

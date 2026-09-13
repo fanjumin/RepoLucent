@@ -1,0 +1,1 @@
+{"required": ["identifier", "name", "version", "description", "author", "min_app_version", "agent_role", "capabilities"], "properties": {"agent_role": {"enum": ["athena", "content", "business", "builder"]}, "category": {"enum": ["system", "shop", "tools"]}}}

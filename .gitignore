@@ -1,0 +1,35 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# ===== Local outputs / logs =====
+out/
+*.log
+_openclaw-baseline-regress.log
+
+# ===== Cleanup archives (staging, not source) =====
+_archive_cleanup_*/
+
+# ===== Local machine-specific config =====
+repolens.ini
+settings.json
+settings.json.bak
+*.bak
+
+# ===== Experimental / prototype leftovers =====
+.exe/
+/a/
+/for/
+/look/
+inbox/
+script_sweep_prototypes/
+
+# ===== OS =====
+Thumbs.db
+desktop.ini
+.DS_Store

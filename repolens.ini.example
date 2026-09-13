@@ -1,0 +1,3 @@
+# RepoLens launcher config (rename to repolens.ini to use).
+# ASCII only. Values are read by start_repolens.bat.
+repo=F:\Sites\VeroRun

@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "repolens"
+version = "2.0.0"
+description = "RepoLens - 通用 Python 仓库架构洞察工具（本地私有化代码库事实源：分析 / 门禁 / 审计 / MCP 按需供给）"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [{ name = "VeroRun Team" }]
+keywords = ["code-analysis", "repository", "ast", "mcp", "agents-md", "architecture"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+]
+# 运行时零第三方依赖：python repolens.py 不需要 pip install 任何东西。
+# setuptools 仅作为构建后端元数据（打包分发时使用），不进入运行时。
+dependencies = []
+
+[project.optional-dependencies]
+# 仅 CI / 本地跑 pytest 金字塔时需要；verify_*.py 回归套件本身零依赖。
+test = ["pytest>=7.0"]
+
+[project.scripts]
+repolens = "repo_lens.cli:main"
+
+[project.urls]
+Homepage = "https://agent.easykai.cn"
+
+[tool.setuptools]
+packages = { find = { include = ["repo_lens*"] } }
+
+[tool.setuptools.package-data]
+repo_lens = [
+    "registry.json",
+    "registry.core.json",
+    "settings.default.json",
+    "packs/*/registry.json",
+    "schemas/*.json",
+    "ui/static/*",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    "unit: py_ast / cache 等纯函数边界用例（秒级）",
+    "golden: fixture 仓库 --deterministic 产物逐字节快照",
+    "perf: 性能门禁（fixture 宽松预算；真实仓库指标仅人工采集）",
+]

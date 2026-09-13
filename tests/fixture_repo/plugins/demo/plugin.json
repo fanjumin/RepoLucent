@@ -1,0 +1,1 @@
+{"identifier": "demo", "name": "Demo", "version": "1.0.0", "description": "demo", "author": "t", "min_app_version": "0.10.0", "agent_role": "business", "capabilities": ["demo.x"], "depends_on": {"shop": ">=1.0.0"}}

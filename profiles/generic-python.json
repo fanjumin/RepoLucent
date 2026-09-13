@@ -1,0 +1,17 @@
+{
+  "profile": {
+    "name": "generic-python",
+    "repo_signature": { "dirs": [], "files": ["pyproject.toml"] },
+    "component": { "dir": "", "manifest": "", "required_fields": [], "id_pattern": "" },
+    "core_modules": {},
+    "auto_core_exclude": ["docs", "tests", "scripts", "tools", "build", "dist"],
+    "exclude_dirs": [".git", ".github", ".pytest_cache", ".mypy_cache", ".idea",
+                     ".vscode", "venv", ".venv", "env", "node_modules",
+                     "__pycache__", "build", "dist", "htmlcov"],
+    "root_entry_allowlist": [],
+    "key_docs": ["README.md", "CHANGELOG.md", "AGENTS.md"],
+    "standard_doc_pattern": "",
+    "frontend_repo_names": [],
+    "default_gates": ["file-too-large"]
+  }
+}

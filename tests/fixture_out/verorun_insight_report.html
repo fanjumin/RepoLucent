@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VeroRun 架构洞察报告</title>
+<style>
+:root { --ink:#1c2430; --muted:#6b7684; --line:#e3e8ee; --blue:#2563eb; --bg:#f6f8fb; }
+* { box-sizing:border-box; }
+body { margin:0; font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+       color:var(--ink); background:var(--bg); line-height:1.6; }
+.wrap { max-width:1080px; margin:0 auto; padding:28px 20px 64px; }
+h1 { font-size:26px; margin:0 0 4px; }
+h2 { font-size:20px; margin:36px 0 12px; border-left:4px solid var(--blue); padding-left:10px; }
+h3 { font-size:16px; margin:22px 0 8px; }
+.meta { color:var(--muted); font-size:13px; margin-bottom:24px; }
+.metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+            gap:12px; margin:18px 0; }
+.metric { background:#fff; border:1px solid var(--line); border-radius:10px;
+           padding:14px 16px; }
+.metric b { display:block; font-size:24px; }
+.metric span { color:var(--muted); font-size:12px; }
+table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--line);
+         border-radius:8px; overflow:hidden; font-size:13px; margin:10px 0 6px; }
+th { background:#eef2f7; text-align:left; padding:8px 10px; white-space:nowrap; }
+td { padding:7px 10px; border-top:1px solid var(--line); vertical-align:top; }
+td.num { text-align:right; font-variant-numeric:tabular-nums; }
+code { background:#eef2f7; padding:1px 5px; border-radius:4px; font-size:12px; }
+pre { background:#0f172a; color:#dbe4f0; padding:14px 16px; border-radius:10px;
+       overflow:auto; font-size:12px; }
+.ok { color:#15803d; } .bad { color:#b91c1c; } .warn { color:#b45309; }
+.muted { color:var(--muted); }
+.note { background:#fffbeb; border:1px solid #fde68a; border-radius:8px;
+         padding:10px 14px; font-size:13px; }
+</style>
+</head>
+<body><div class="wrap">
+<h1>VeroRun AI 系统架构洞察报告</h1>
+<div class="meta">由 verorun-dev-insight v1.2.0 自动生成 · 2026-09-09 10:55:36 ·
+仓库 C:\Users\jumin\.openclaw-autoclaw\workspace\projects\verorun-dev-insight\tests\fixture_repo · 耗时 55 ms · 本地工具产物，不入 Git</div>
+<div class="note"><b>统计口径</b>：代码行统计口径：真实代码扩展名 (.py/.js/.ts/.vue/.html/.css/.sh/.sql)；已排除 docs/ 目录、根目录本地调试脚本、临时文件；.md/.yml/.json 等文档/文案仅计入资产文件数，不计代码行。</div>
+
+<div class="metrics">
+<div class="metric"><b>3</b><span>系统核心模块</span></div>
+<div class="metric"><b>2</b><span>业务插件</span></div>
+<div class="metric"><b>13</b><span>文件总数（含资产）</span></div>
+<div class="metric"><b>53</b><span>代码行</span></div>
+<div class="metric"><b>2</b><span>插件路由</span></div>
+<div class="metric"><b>1</b><span>manifest 待修复</span></div>
+</div>
+
+<h2>代码量统计</h2><h3>按语言 / 扩展名（代码量 TOP）</h3><table><tr><th>类型</th><th class='num'>代码行</th><th class='num'>文件</th></tr><tr><td><code>.py</code></td><td class='num'>53</td><td class='num'>10</td></tr></table><h3>按顶层目录（代码量 TOP）</h3><table><tr><th>目录</th><th class='num'>代码行</th><th class='num'>总行</th><th class='num'>文件</th></tr><tr><td><code>plugin_manager</code></td><td class='num'>31</td><td class='num'>34</td><td class='num'>3</td></tr><tr><td><code>plugins</code></td><td class='num'>18</td><td class='num'>22</td><td class='num'>7</td></tr><tr><td><code>i18n</code></td><td class='num'>2</td><td class='num'>2</td><td class='num'>1</td></tr><tr><td><code>shared</code></td><td class='num'>2</td><td class='num'>2</td><td class='num'>1</td></tr><tr><td><code>&lt;root&gt;</code></td><td class='num'>0</td><td class='num'>0</td><td class='num'>1</td></tr></table><h3>代码量最大文件 TOP 10</h3><table><tr><th>文件</th><th class='num'>代码行</th><th class='num'>总行</th></tr><tr><td><code>plugin_manager\base.py</code></td><td class='num'>19</td><td class='num'>21</td></tr><tr><td><code>plugins\demo\routes.py</code></td><td class='num'>8</td><td class='num'>10</td></tr><tr><td><code>plugin_manager\discovery.py</code></td><td class='num'>7</td><td class='num'>7</td></tr><tr><td><code>plugins\demo\__init__.py</code></td><td class='num'>6</td><td class='num'>7</td></tr><tr><td><code>plugin_manager\manager.py</code></td><td class='num'>5</td><td class='num'>6</td></tr><tr><td><code>i18n\__init__.py</code></td><td class='num'>2</td><td class='num'>2</td></tr><tr><td><code>plugins\_base\db.py</code></td><td class='num'>2</td><td class='num'>2</td></tr><tr><td><code>plugins\bad\__init__.py</code></td><td class='num'>2</td><td class='num'>2</td></tr><tr><td><code>shared\__init__.py</code></td><td class='num'>2</td><td class='num'>2</td></tr><tr><td><code>plugins\__init__.py</code></td><td class='num'>0</td><td class='num'>1</td></tr></table>
+
+<h2>目录结构（深度 2）</h2>
+<pre>fixture_repo/
+├── i18n/  (1 .py)  ← 核心
+│   └── __init__.py
+├── plugin_manager/  (3 .py)  ← 核心
+│   ├── base.py
+│   ├── discovery.py
+│   └── manager.py
+├── plugins/  (5 .py)  ← 插件
+│   ├── _base/  (1 .py)
+│   ├── bad/  (1 .py)  ← 插件
+│   ├── demo/  (2 .py)  ← 插件
+│   └── __init__.py
+├── shared/  (1 .py)  ← 核心
+│   └── __init__.py
+├── AGENTS.md
+├── debug_probe.py
+└── test_results.json</pre>
+
+<h2>系统核心模块</h2>
+<table><tr><th>模块</th><th>职责</th><th>.py</th><th>LOC</th><th>关键类</th><th>路由</th></tr>
+<tr><td><code>i18n</code></td><td>国际化：系统级翻译函数 _() 与语言管理</td><td class='num'>1</td><td class='num'>2</td><td>—</td><td class='num'>0</td></tr><tr><td><code>plugin_manager</code></td><td>插件框架：发现/加载/生命周期/Hooks/事件总线/技能注册/商店</td><td class='num'>3</td><td class='num'>34</td><td>PluginManager、BasePlugin</td><td class='num'>0</td></tr><tr><td><code>shared</code></td><td>共享基础设施：HTTP 客户端、日志、可观测性</td><td class='num'>1</td><td class='num'>2</td><td>—</td><td class='num'>0</td></tr></table>
+
+<h2>插件开发契约 BasePlugin</h2>
+<p class="muted">所有插件必须继承 plugin_manager.base.BasePlugin；运行时引用
+（self.manager / self.app / self.plugin_info / self._log）由 PluginManager 注入。</p>
+<table><tr><th>方法</th><th>签名</th><th>要求</th><th>说明</th></tr><tr><td><code>setup</code></td><td><code>setup(self)</code></td><td class='warn'>必须实现</td><td>Called once before activate.</td></tr><tr><td><code>activate</code></td><td><code>activate(self)</code></td><td class='warn'>必须实现</td><td>Enable plugin features.</td></tr><tr><td><code>deactivate</code></td><td><code>deactivate(self)</code></td><td class='ok'>可选</td><td>Tear down.</td></tr><tr><td><code>t</code></td><td><code>t(self, text, locale=None)</code></td><td class='ok'>可选</td><td>Translate text via plugin i18n.</td></tr></table>
+
+<h2>业务插件目录（2 个）</h2>
+<table><tr><th>插件</th><th>版本</th><th>角色</th><th>分类</th><th>路由</th><th>LOC</th><th>BasePlugin</th><th>manifest</th></tr>
+<tr><td><code>Bad-Id</code></td><td>1.0</td><td>—</td><td>—</td><td class='num'>0</td><td class='num'>2</td><td class='bad'>✗</td><td class='bad' title='缺少必填字段: description; 缺少必填字段: author; 缺少必填字段: min_app_version; 缺少必填字段: agent_role; 缺少必填字段: capabilities; identifier 不符合 ^[a-z0-9_]+$: &#x27;Bad-Id&#x27;; version 不符合语义化版本 X.Y.Z: &#x27;1.0&#x27;'>✗</td></tr><tr><td><code>demo</code></td><td>1.0.0</td><td>business</td><td>—</td><td class='num'>2</td><td class='num'>17</td><td class='ok'>✓</td><td class='ok' title=''>✓</td></tr></table>
+<p class="muted">✗ manifest 列悬停可查看缺失字段；✗ BasePlugin 列表示未检出继承 BasePlugin 的类。</p>
+
+<h2>核心与插件的交互</h2>
+<h3>插件 → 核心导入排名</h3><table><tr><th>核心模块</th><th>导入次数</th></tr><tr><td><code>plugin_manager</code></td><td class='num'>1</td></tr></table>
+<p class='ok'>未发现核心 → 业务插件的直接导入，边界清晰。</p>
+
+<h2>开发规范摘要</h2>
+<div class="note"><b>plugin.json 必填字段</b>：identifier, name, version, description, author, min_app_version, agent_role, capabilities
+<br>来源：docs/plugin-manifest.schema.json</div>
+<ul><li><code>agent_role</code>：athena / content / business / builder</li><li><code>category</code>：system / shop / tools</li></ul>
+
+
+
+
+<h2>新插件开发流程</h2>
+<ol>
+<li>复制 <code>plugins/_templates/react_plugin</code>（或 vue）到 <code>plugins/&lt;identifier&gt;/</code></li>
+<li>编写 <code>plugin.json</code>（必填字段 + agent_role 枚举 + capabilities 非空）</li>
+<li>实现 BasePlugin 子类（setup / activate / deactivate 抽象方法）</li>
+<li>Flask Blueprint 暴露路由，惯例 url_prefix=/admin/&lt;identifier&gt;</li>
+<li>数据库走 get_pooled_connection() + 独立 schema；文案走插件 i18n + self.t()</li>
+<li>运行本工具复核校验结果，再按 plugin-standard 提交审核</li>
+</ol>
+</div></body></html>

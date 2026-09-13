@@ -1,0 +1,615 @@
+{
+  "meta": {
+    "schema_version": "1.4",
+    "tool": "repolens",
+    "tool_version": "2.0.0",
+    "generated_at": null,
+    "repo_root": "fixture_repo",
+    "tree_depth": 2,
+    "tree": "fixture_repo/\n├── i18n/  (1 .py)  ← 核心\n│   └── __init__.py\n├── plugin_manager/  (3 .py)  ← 核心\n│   ├── base.py\n│   ├── discovery.py\n│   └── manager.py\n├── plugins/  (5 .py)  ← 插件\n│   ├── _base/  (1 .py)\n│   ├── bad/  (1 .py)  ← 插件\n│   ├── demo/  (2 .py)  ← 插件\n│   └── __init__.py\n├── shared/  (1 .py)  ← 核心\n│   └── __init__.py\n├── AGENTS.md\n├── debug_probe.py\n└── test_results.json",
+    "duration_ms": null
+  },
+  "overview": {
+    "total_files": 13,
+    "total_asset_files": 3,
+    "total_lines": 60,
+    "total_code_lines": 53,
+    "code_scope_note": "代码行统计口径：真实代码扩展名 (.py/.js/.ts/.vue/.html/.css/.sh/.sql)；已排除 docs/ 目录、根目录本地调试脚本、临时文件；.md/.yml/.json 等文档/文案仅计入资产文件数，不计代码行。",
+    "ext_distribution": {
+      ".py": 10,
+      ".json": 2,
+      ".md": 1
+    },
+    "by_language": [
+      {
+        "ext": ".py",
+        "files": 10,
+        "code": 53
+      }
+    ],
+    "by_top_dir": [
+      {
+        "dir": "plugin_manager",
+        "files": 3,
+        "lines": 34,
+        "code": 31
+      },
+      {
+        "dir": "plugins",
+        "files": 7,
+        "lines": 22,
+        "code": 18
+      },
+      {
+        "dir": "i18n",
+        "files": 1,
+        "lines": 2,
+        "code": 2
+      },
+      {
+        "dir": "shared",
+        "files": 1,
+        "lines": 2,
+        "code": 2
+      },
+      {
+        "dir": "<root>",
+        "files": 1,
+        "lines": 0,
+        "code": 0
+      }
+    ],
+    "top_files": [
+      {
+        "file": "plugin_manager\\base.py",
+        "lines": 21,
+        "code": 19
+      },
+      {
+        "file": "plugins\\demo\\routes.py",
+        "lines": 10,
+        "code": 8
+      },
+      {
+        "file": "plugin_manager\\discovery.py",
+        "lines": 7,
+        "code": 7
+      },
+      {
+        "file": "plugins\\demo\\__init__.py",
+        "lines": 7,
+        "code": 6
+      },
+      {
+        "file": "plugin_manager\\manager.py",
+        "lines": 6,
+        "code": 5
+      },
+      {
+        "file": "i18n\\__init__.py",
+        "lines": 2,
+        "code": 2
+      },
+      {
+        "file": "plugins\\_base\\db.py",
+        "lines": 2,
+        "code": 2
+      },
+      {
+        "file": "plugins\\bad\\__init__.py",
+        "lines": 2,
+        "code": 2
+      },
+      {
+        "file": "shared\\__init__.py",
+        "lines": 2,
+        "code": 2
+      },
+      {
+        "file": "plugins\\__init__.py",
+        "lines": 1,
+        "code": 0
+      }
+    ]
+  },
+  "core": {
+    "modules": [
+      {
+        "name": "i18n",
+        "description": "国际化：系统级翻译函数 _() 与语言管理",
+        "known": true,
+        "py_files": 1,
+        "loc": 2,
+        "loc_code": 2,
+        "package_docstring": null,
+        "classes": [],
+        "class_total": 0,
+        "functions": [],
+        "function_total": 0,
+        "blueprints": [],
+        "routes": [],
+        "route_count": 0,
+        "import_roots": {}
+      },
+      {
+        "name": "plugin_manager",
+        "description": "插件框架：发现/加载/生命周期/Hooks/事件总线/技能注册/商店",
+        "known": true,
+        "py_files": 3,
+        "loc": 34,
+        "loc_code": 31,
+        "package_docstring": null,
+        "classes": [
+          {
+            "name": "PluginManager",
+            "bases": [],
+            "docstring": "Load and manage plugins.",
+            "file": "plugin_manager\\manager.py",
+            "methods": [
+              {
+                "name": "is_enabled",
+                "signature": "is_enabled(self, pid)",
+                "docstring": null,
+                "abstract": false
+              },
+              {
+                "name": "get_config",
+                "signature": "get_config(self, pid)",
+                "docstring": null,
+                "abstract": false
+              }
+            ]
+          },
+          {
+            "name": "BasePlugin",
+            "bases": [
+              "ABC"
+            ],
+            "docstring": null,
+            "file": "plugin_manager\\base.py",
+            "methods": [
+              {
+                "name": "setup",
+                "signature": "setup(self)",
+                "docstring": "Called once before activate.",
+                "abstract": true
+              },
+              {
+                "name": "activate",
+                "signature": "activate(self)",
+                "docstring": "Enable plugin features.",
+                "abstract": true
+              },
+              {
+                "name": "deactivate",
+                "signature": "deactivate(self)",
+                "docstring": "Tear down.",
+                "abstract": false
+              },
+              {
+                "name": "t",
+                "signature": "t(self, text, locale=None)",
+                "docstring": "Translate text via plugin i18n.",
+                "abstract": false
+              }
+            ]
+          }
+        ],
+        "class_total": 2,
+        "functions": [],
+        "function_total": 0,
+        "blueprints": [],
+        "routes": [],
+        "route_count": 0,
+        "import_roots": {
+          "abc": 1,
+          "base": 1
+        }
+      },
+      {
+        "name": "shared",
+        "description": "共享基础设施：HTTP 客户端、日志、可观测性",
+        "known": true,
+        "py_files": 1,
+        "loc": 2,
+        "loc_code": 2,
+        "package_docstring": null,
+        "classes": [],
+        "class_total": 0,
+        "functions": [
+          {
+            "name": "pooled",
+            "signature": "def pooled()",
+            "docstring": null,
+            "file": "shared\\__init__.py"
+          }
+        ],
+        "function_total": 1,
+        "blueprints": [],
+        "routes": [],
+        "route_count": 0,
+        "import_roots": {}
+      }
+    ],
+    "module_count": 3,
+    "entry_files": [],
+    "plugin_system": {
+      "base_plugin": {
+        "file": "plugin_manager/base.py",
+        "docstring": null,
+        "methods": [
+          {
+            "name": "setup",
+            "signature": "setup(self)",
+            "docstring": "Called once before activate.",
+            "abstract": true
+          },
+          {
+            "name": "activate",
+            "signature": "activate(self)",
+            "docstring": "Enable plugin features.",
+            "abstract": true
+          },
+          {
+            "name": "deactivate",
+            "signature": "deactivate(self)",
+            "docstring": "Tear down.",
+            "abstract": false
+          },
+          {
+            "name": "t",
+            "signature": "t(self, text, locale=None)",
+            "docstring": "Translate text via plugin i18n.",
+            "abstract": false
+          }
+        ]
+      },
+      "manager_api": {
+        "class": "PluginManager",
+        "file": "plugin_manager/manager.py",
+        "methods": [
+          {
+            "name": "is_enabled",
+            "signature": "is_enabled(self, pid)",
+            "docstring": null
+          },
+          {
+            "name": "get_config",
+            "signature": "get_config(self, pid)",
+            "docstring": null
+          }
+        ]
+      },
+      "discovery_rules": [
+        "Plugin Manager - PluginDiscovery.",
+        "Rules:",
+        "  1. Must be plugins/<name>/ subdir",
+        "  2. Must contain __init__.py",
+        "  3. Must contain plugin.json (valid JSON)",
+        "  4. Ignore dirs starting with _ or ."
+      ],
+      "support_modules": [],
+      "hooks_events": {}
+    }
+  },
+  "plugins": {
+    "count": 2,
+    "rejected_dirs": [],
+    "manifest_required": [
+      "identifier",
+      "name",
+      "version",
+      "description",
+      "author",
+      "min_app_version",
+      "agent_role",
+      "capabilities"
+    ],
+    "manifest_schema_file": "docs/plugin-manifest.schema.json",
+    "manifest_enums": {
+      "agent_role": [
+        "athena",
+        "content",
+        "business",
+        "builder"
+      ],
+      "category": [
+        "system",
+        "shop",
+        "tools"
+      ]
+    },
+    "items": [
+      {
+        "identifier": "Bad-Id",
+        "dir": "bad",
+        "name": "Bad",
+        "version": "1.0",
+        "category": "",
+        "agent_role": "",
+        "capabilities": [],
+        "description": "",
+        "author": "",
+        "min_app_version": "",
+        "price_type": "free",
+        "permissions": [],
+        "depends_on": {},
+        "dependencies": {},
+        "hooks_keys": [],
+        "path": "plugins/bad",
+        "manifest_valid": false,
+        "manifest_errors": [
+          "缺少必填字段: description",
+          "缺少必填字段: author",
+          "缺少必填字段: min_app_version",
+          "缺少必填字段: agent_role",
+          "缺少必填字段: capabilities",
+          "identifier 不符合 ^[a-z0-9_]+$: 'Bad-Id'",
+          "version 不符合语义化版本 X.Y.Z: '1.0'"
+        ],
+        "py_files": 1,
+        "loc": 2,
+        "loc_code": 2,
+        "entry_docstring": null,
+        "plugin_classes": [],
+        "blueprints": [],
+        "routes": [],
+        "route_count": 0,
+        "route_truncated": false,
+        "i18n_locales": [],
+        "has_templates": false,
+        "has_static": false,
+        "has_tests": false,
+        "docs": []
+      },
+      {
+        "identifier": "demo",
+        "dir": "demo",
+        "name": "Demo",
+        "version": "1.0.0",
+        "category": "",
+        "agent_role": "business",
+        "capabilities": [
+          "demo.x"
+        ],
+        "description": "demo",
+        "author": "t",
+        "min_app_version": "0.10.0",
+        "price_type": "free",
+        "permissions": [],
+        "depends_on": {
+          "shop": ">=1.0.0"
+        },
+        "dependencies": {},
+        "hooks_keys": [],
+        "path": "plugins/demo",
+        "manifest_valid": true,
+        "manifest_errors": [],
+        "py_files": 2,
+        "loc": 17,
+        "loc_code": 14,
+        "entry_docstring": null,
+        "plugin_classes": [
+          {
+            "name": "DemoPlugin",
+            "file": "plugins\\demo\\__init__.py"
+          }
+        ],
+        "blueprints": [
+          {
+            "var": "demo_bp",
+            "name": "'demo'",
+            "url_prefix": "'/admin/demo'",
+            "file": "plugins\\demo\\routes.py"
+          }
+        ],
+        "routes": [
+          {
+            "bp": "demo_bp",
+            "url_prefix": "'/admin/demo'",
+            "rule": "'/ping'",
+            "methods": [
+              "GET",
+              "POST"
+            ],
+            "endpoint": "ping",
+            "lineno": 5,
+            "file": "plugins\\demo\\routes.py"
+          },
+          {
+            "bp": "demo_bp",
+            "url_prefix": "'/admin/demo'",
+            "rule": "'/list'",
+            "methods": [
+              "GET"
+            ],
+            "endpoint": "list_items",
+            "lineno": 9,
+            "file": "plugins\\demo\\routes.py"
+          }
+        ],
+        "route_count": 2,
+        "route_truncated": false,
+        "i18n_locales": [],
+        "has_templates": false,
+        "has_static": false,
+        "has_tests": false,
+        "docs": []
+      }
+    ],
+    "framework": {
+      "base_helpers": [
+        {
+          "module": "plugins._base.db",
+          "docstring": null
+        }
+      ],
+      "templates": []
+    }
+  },
+  "interactions": {
+    "plugins_import_core": [
+      {
+        "module": "plugin_manager",
+        "import_count": 1
+      }
+    ],
+    "plugins_use_base_helpers": [],
+    "plugin_to_plugin": [
+      {
+        "from": "demo",
+        "to": [
+          "shop"
+        ]
+      }
+    ],
+    "base_plugin_inheritance": {
+      "plugins_with_base_class": 1,
+      "plugins_total": 2
+    },
+    "boundary_observations": {
+      "rule": "核心模块不应直接 import 业务插件（plugin_manager 动态加载除外）",
+      "violations": [],
+      "checked_files": 5
+    }
+  },
+  "standards": {
+    "manifest_required": [
+      "identifier",
+      "name",
+      "version",
+      "description",
+      "author",
+      "min_app_version",
+      "agent_role",
+      "capabilities"
+    ],
+    "manifest_enums": {
+      "agent_role": [
+        "athena",
+        "content",
+        "business",
+        "builder"
+      ],
+      "category": [
+        "system",
+        "shop",
+        "tools"
+      ]
+    },
+    "manifest_schema_file": "docs/plugin-manifest.schema.json",
+    "plugin_standard": null,
+    "agents_md": {
+      "file": "AGENTS.md",
+      "headings": [
+        "路径最高铁律",
+        "流水线铁律"
+      ],
+      "note": "AGENTS.md 为项目最高优先级约束文件，开发前必须完整阅读原文。"
+    },
+    "key_docs": [
+      {
+        "file": "AGENTS.md",
+        "title": "AGENTS.md",
+        "bytes": 73
+      },
+      {
+        "file": "docs/plugin-manifest.schema.json",
+        "title": "plugin-manifest.schema.json",
+        "bytes": 258
+      }
+    ],
+    "plugin_templates": [],
+    "base_helpers": [
+      {
+        "module": "plugins._base.db",
+        "docstring": null
+      }
+    ]
+  },
+  "symbols": {
+    "schema": 1,
+    "count": 11,
+    "index_file": "repo_lens_symbols.json"
+  },
+  "findings": {
+    "schema_version": "1.0",
+    "summary": {
+      "error": 3,
+      "warning": 4,
+      "info": 0
+    },
+    "items": [
+      {
+        "rule_id": "SPEC001",
+        "severity": "error",
+        "category": "spec",
+        "target": "demo",
+        "file": null,
+        "line": null,
+        "message": "agent_role='business' 不在核心角色集合",
+        "evidence": "agent_role='business'"
+      },
+      {
+        "rule_id": "SPEC002",
+        "severity": "error",
+        "category": "spec",
+        "target": "Bad-Id",
+        "file": null,
+        "line": null,
+        "message": "capabilities 为空",
+        "evidence": "capabilities=[]"
+      },
+      {
+        "rule_id": "SPEC005",
+        "severity": "error",
+        "category": "spec",
+        "target": "Bad-Id",
+        "file": null,
+        "line": null,
+        "message": "version='1.0' 不符合 X.Y.Z 语义化版本",
+        "evidence": "version='1.0'"
+      },
+      {
+        "rule_id": "SPEC003",
+        "severity": "warning",
+        "category": "spec",
+        "target": "Bad-Id",
+        "file": null,
+        "line": null,
+        "message": "插件缺 i18n/ 国际化目录",
+        "evidence": "i18n_locales=[]"
+      },
+      {
+        "rule_id": "SPEC003",
+        "severity": "warning",
+        "category": "spec",
+        "target": "demo",
+        "file": null,
+        "line": null,
+        "message": "插件缺 i18n/ 国际化目录",
+        "evidence": "i18n_locales=[]"
+      },
+      {
+        "rule_id": "SPEC004",
+        "severity": "warning",
+        "category": "spec",
+        "target": "Bad-Id",
+        "file": null,
+        "line": null,
+        "message": "插件缺 README/文档",
+        "evidence": "docs=[]"
+      },
+      {
+        "rule_id": "SPEC004",
+        "severity": "warning",
+        "category": "spec",
+        "target": "demo",
+        "file": null,
+        "line": null,
+        "message": "插件缺 README/文档",
+        "evidence": "docs=[]"
+      }
+    ]
+  }
+}

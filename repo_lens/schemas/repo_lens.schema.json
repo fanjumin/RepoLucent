@@ -1,0 +1,220 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RepoLens 产物契约（repo_lens.json）",
+  "description": "SCHEMA_VERSION 1.3 的事实源契约。MAJOR 变更 = 删字段/改名/改类型语义；MINOR 变更 = 只增可选字段，消费方必须忽略未识别字段。校验器见 repo_lens/schema_check.py（纯标准库，不依赖 jsonschema 包）。",
+  "type": "object",
+  "required": ["meta", "overview", "core", "plugins", "interactions", "standards"],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["schema_version", "tool", "tool_version", "repo_root", "tree"],
+      "properties": {
+        "schema_version": { "type": "string", "description": "MAJOR.MINOR" },
+        "tool": { "type": "string" },
+        "tool_version": { "type": "string" },
+        "generated_at": { "type": ["string", "null"], "description": "--deterministic 下为 null" },
+        "repo_root": { "type": "string" },
+        "tree_depth": { "type": "integer" },
+        "tree": { "type": "string" },
+        "duration_ms": { "type": ["integer", "null"] }
+      }
+    },
+    "overview": {
+      "type": "object",
+      "required": ["total_files", "total_lines", "total_code_lines"],
+      "properties": {
+        "total_files": { "type": "integer" },
+        "total_asset_files": { "type": "integer" },
+        "total_lines": { "type": "integer" },
+        "total_code_lines": { "type": "integer" },
+        "code_scope_note": { "type": "string" },
+        "ext_distribution": { "type": "object" },
+        "by_language": { "type": "array", "items": { "$ref": "#/definitions/langRow" } },
+        "by_top_dir": { "type": "array", "items": { "$ref": "#/definitions/dirRow" } },
+        "top_files": { "type": "array", "items": { "$ref": "#/definitions/fileRow" } }
+      }
+    },
+    "core": {
+      "type": "object",
+      "required": ["modules", "module_count", "plugin_system"],
+      "properties": {
+        "modules": { "type": "array", "items": { "$ref": "#/definitions/coreModule" } },
+        "module_count": { "type": "integer" },
+        "entry_files": { "type": "array", "items": { "$ref": "#/definitions/fileRow" } },
+        "plugin_system": { "type": "object" }
+      }
+    },
+    "plugins": {
+      "type": "object",
+      "required": ["count", "items"],
+      "properties": {
+        "count": { "type": "integer" },
+        "items": { "type": "array", "items": { "$ref": "#/definitions/pluginItem" } },
+        "rejected_dirs": { "type": "array" },
+        "manifest_required": { "type": "array", "items": { "type": "string" } },
+        "manifest_enums": { "type": "object" },
+        "manifest_schema_file": { "type": ["string", "null"] },
+        "framework": { "type": "object" }
+      }
+    },
+    "interactions": {
+      "type": "object",
+      "required": ["plugins_import_core", "plugin_to_plugin", "boundary_observations"],
+      "properties": {
+        "plugins_import_core": { "type": "array", "items": { "$ref": "#/definitions/countRow" } },
+        "plugins_use_base_helpers": { "type": "array", "items": { "$ref": "#/definitions/countRow" } },
+        "plugin_to_plugin": { "type": "array", "items": { "$ref": "#/definitions/edgeRow" } },
+        "base_plugin_inheritance": { "type": "object" },
+        "boundary_observations": {
+          "type": "object",
+          "required": ["rule", "violations"],
+          "properties": {
+            "rule": { "type": "string" },
+            "violations": { "type": "array" },
+            "checked_files": { "type": "integer" }
+          }
+        }
+      }
+    },
+    "standards": {
+      "type": "object",
+      "required": ["manifest_required", "manifest_enums", "key_docs"],
+      "properties": {
+        "manifest_required": { "type": "array", "items": { "type": "string" } },
+        "manifest_enums": { "type": "object" },
+        "manifest_schema_file": { "type": ["string", "null"] },
+        "plugin_standard": { "type": ["object", "null"] },
+        "agents_md": { "type": ["object", "null"] },
+        "key_docs": { "type": "array", "items": { "$ref": "#/definitions/docRow" } },
+        "plugin_templates": { "type": "array" },
+        "base_helpers": { "type": "array" }
+      }
+    },
+    "symbols": {
+      "type": "object",
+      "description": "v1.6.0 MINOR 新增：符号索引摘要段（全量索引在 index_file 指向的独立产物）",
+      "required": ["schema", "count", "index_file"],
+      "properties": {
+        "schema": { "type": "integer" },
+        "count": { "type": "integer" },
+        "index_file": { "type": "string" }
+      }
+    },
+    "frontend": { "type": "array", "description": "v1.4.0 起可选：前端/桌面端仓库分析段" },
+    "hotspots": { "type": "object", "description": "v1.5.0 起可选：变更热点段（git 可用时）" },
+    "deep_dive": { "type": "object", "description": "--module/--plugin 时可选：目标深挖段" }
+  },
+  "definitions": {
+    "langRow": {
+      "type": "object",
+      "required": ["ext", "files", "code"],
+      "properties": {
+        "ext": { "type": "string" },
+        "files": { "type": "integer" },
+        "code": { "type": "integer" }
+      }
+    },
+    "dirRow": {
+      "type": "object",
+      "required": ["dir", "files", "lines", "code"],
+      "properties": {
+        "dir": { "type": "string" },
+        "files": { "type": "integer" },
+        "lines": { "type": "integer" },
+        "code": { "type": "integer" }
+      }
+    },
+    "fileRow": {
+      "type": "object",
+      "required": ["file"],
+      "properties": {
+        "file": { "type": "string" },
+        "lines": { "type": "integer" },
+        "code": { "type": "integer" },
+        "loc": { "type": "integer" },
+        "docstring": { "type": ["string", "null"] }
+      }
+    },
+    "countRow": {
+      "type": "object",
+      "required": ["import_count"],
+      "properties": { "import_count": { "type": "integer" } }
+    },
+    "edgeRow": {
+      "type": "object",
+      "required": ["from", "to"],
+      "properties": {
+        "from": { "type": "string" },
+        "to": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "docRow": {
+      "type": "object",
+      "required": ["file", "title"],
+      "properties": {
+        "file": { "type": "string" },
+        "title": { "type": "string" },
+        "bytes": { "type": "integer" }
+      }
+    },
+    "coreModule": {
+      "type": "object",
+      "required": ["name", "py_files", "loc", "route_count"],
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "known": { "type": "boolean" },
+        "py_files": { "type": "integer" },
+        "loc": { "type": "integer" },
+        "loc_code": { "type": "integer" },
+        "package_docstring": { "type": ["string", "null"] },
+        "classes": { "type": "array" },
+        "class_total": { "type": "integer" },
+        "functions": { "type": "array" },
+        "function_total": { "type": "integer" },
+        "blueprints": { "type": "array" },
+        "routes": { "type": "array" },
+        "route_count": { "type": "integer" },
+        "import_roots": { "type": "object" }
+      }
+    },
+    "pluginItem": {
+      "type": "object",
+      "required": ["identifier", "dir", "version", "manifest_valid", "route_count"],
+      "properties": {
+        "identifier": { "type": "string" },
+        "dir": { "type": "string" },
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "category": { "type": "string" },
+        "agent_role": { "type": "string" },
+        "capabilities": { "type": "array" },
+        "description": { "type": "string" },
+        "author": { "type": "string" },
+        "min_app_version": { "type": "string" },
+        "price_type": { "type": "string" },
+        "permissions": { "type": "array" },
+        "depends_on": { "type": ["object", "array"] },
+        "dependencies": { "type": ["object", "array"] },
+        "hooks_keys": { "type": "array" },
+        "path": { "type": "string" },
+        "manifest_valid": { "type": "boolean" },
+        "manifest_errors": { "type": "array", "items": { "type": "string" } },
+        "py_files": { "type": "integer" },
+        "loc": { "type": "integer" },
+        "loc_code": { "type": "integer" },
+        "entry_docstring": { "type": ["string", "null"] },
+        "plugin_classes": { "type": "array" },
+        "blueprints": { "type": "array" },
+        "routes": { "type": "array" },
+        "route_count": { "type": "integer" },
+        "route_truncated": { "type": "boolean" },
+        "i18n_locales": { "type": "array" },
+        "has_templates": { "type": "boolean" },
+        "has_static": { "type": "boolean" },
+        "has_tests": { "type": "boolean" },
+        "docs": { "type": "array" }
+      }
+    }
+  }
+}

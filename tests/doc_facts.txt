@@ -1,0 +1,137 @@
+== agent_role 枚举 ==
+athena, content, business, builder, finance, ops, service, vision, creative, veroscholar, stock_analyst
+
+== category 枚举 ==
+system, shop, content, ai_agent, social, tools, supply_chain
+
+== price_type 枚举 ==
+free, sub, onetime
+
+== plugin-standard sections ==
+- 0. 设计原则
+- 1. plugin.json 完整 Schema
+- 2. 新增字段规范
+- 3. 模型选择策略 (`model_policy`)
+- 4. 统一网关注册生命周期
+- 5. 数据库变动
+- 6. PluginManager + BasePlugin 代码变动
+- 7. 执行清单
+- 8. 向后兼容
+- 9. 目录结构与部署映射
+- 10. 功能扩展规范
+- 11. 安全与合规
+- 12. 模块解耦标准操作手册（2026-07 追加）
+- 13. 版本发现与升级规范（2026-08 追加）
+- 14. 商店展示规范（2026-08 追加，v1.4）
+- 15. 前端框架插件指南（2026-08 追加，v1.5）
+- 16. 插件审核规范（2026-08 追加，v1.5）
+- 17. 官方插件水印与二次打包防护规范（2026-08 追加，v1.5.2）
+
+== key_docs ==
+- `AGENTS.md` — 【维洛智能（VeroRun AI） - 最高绝对铁律】
+- `GUIDE.md` — VeroRun — Installation & User Guide
+- `CHANGELOG.md` — Changelog
+- `README.md` — VeroRun — Enterprise Multi-Core AI Operating System
+- `docs/developer-guide.md` — VeroRun 插件开发者指南（Developer Guide）
+- `docs/plugin-standard-v1.7.md` — 插件标准 v1.7 — 完整规范
+- `docs/plugin-manifest.schema.json` — plugin-manifest.schema.json
+- `docs/i18n-standard.md` — VeroRun 国际化（i18n）开发标准 v1.0
+- `docs/official-api-security-spec.md` — VeroRun 官方端安全接口规范（V1 凭证吊销 + V4 命令签名）
+
+== BasePlugin 全部方法(含私有) ==
+- app(self)  // Flask app 引用（从 manager 获取），供插件注册中间件等使用。
+- _get_i18n_dir(self) -> str  // Return absolute path to this plugin's i18n/ directory.
+- _load_i18n(self)  // Pre-load this plugin's translation files.
+- t(self, text: str, locale: str = None) -> str  // Plugin i18n: translate text using own i18n/{locale}.yml.
+- setup(self)  // [ENABLED 阶段] 插件初始化。
+- activate(self)  // [ACTIVE 阶段] 插件激活。
+- deactivate(self)  // [DISABLED 阶段] 插件停用。
+- on_install(self, registry) -> bool  // Called when plugin is first installed. Override to init DB tables etc.
+- on_enable(self, registry) -> bool  // Called when plugin is enabled. Override to set up resources.
+- on_disable(self, registry) -> bool  // Called when plugin is disabled. Override to clean up resources.
+- on_uninstall(self, registry) -> bool  // Called when plugin is uninstalled. Drop tables, clean config.
+- register_routes(self) -> List  // Return a list of Flask Blueprints to register.
+- register_jobs(self) -> List[Dict[str, Any]]  // Return a list of APScheduler job config dicts.
+- register_dag_nodes(self) -> Dict[str, Any]  // Return {node_type: handler_function} for DAG workflow engine.
+- register_health_checks(self) -> List[Dict[str, Any]]  // Return a list of health check item dicts.
+- get_event_handlers(self) -> Dict[str, Callable]  // Return {event_name: handler_function} to subscribe to system events.
+- get_config_value(self, key: str, default: Any = None) -> Any  // Get a plugin config value from plugin.json 'config' section.
+- set_config_value(self, key: str, value: Any) -> bool  // Set a plugin config value and persist to database.
+- log(self, message: str, level: str = 'info')  // Log a message with plugin name prefix.
+- validate_config(self) -> List[str]  // Validate _config against config_schema. Return list of errors.
+
+== manager_api methods ==
+- init_app(self, app)  // 工厂模式初始化，绑定到 Flask 应用
+- discover(self) -> List[PluginInfo]  // 扫描 plugins/ 目录，返回新发现的插件列表
+- discover_all(self) -> List[PluginInfo]  // 扫描并返回所有插件（含已注册的）
+- install(self, identifier: str) -> PluginInfo  // 安装插件: 写入 registry 持久化, 状态 → INSTALLED
+- enable(self, identifier: str) -> PluginInfo  // 启用插件: 检查依赖 + 执行 setup(), 状态 → ENABLED
+- activate(self, identifier: str) -> PluginInfo  // 激活插件: 加载模块 + 注册路由/钩子, 状态 → ACTIVE
+- disable(self, identifier: str) -> PluginInfo  // 禁用插件: 反注册路由/钩子, 状态 → DISABLED
+- uninstall(self, identifier: str) -> None  // 卸载插件: 禁用 + 清理 + 移除 registry 记录
+- upgrade(self, identifier: str) -> dict  // 从商店升级插件到最新版本（在线更新）。
+- get_all_stats(self) -> dict  // 聚合所有 ACTIVE 插件的 get_dashboard_stats()。
+- register_all_dag_nodes(self, engine) -> int  // 将 ACTIVE 插件的 register_dag_nodes() 注册到 WorkflowEngine。
+- register_all_plugin_jobs(self, scheduler) -> int  // 将 ACTIVE 插件的 register_jobs() 注册到 SchedulerEngine（APScheduler 进程内）。
+- install_all(self) -> List[str]  // 安装所有已发现但未注册的插件
+- enable_all(self) -> List[str]  // 启用所有已安装的插件
+- activate_all(self) -> List[str]  // 激活所有已启用的插件
+- mount_active_routes(self)  // 启动期挂载所有 enabled/active 插件的路由（必须在首个请求前调用）。
+- mount_all_routes(self)  // 启动期挂载**所有已安装插件**（含 disabled）的路由 + 注册前缀映射。
+- is_path_allowed(self, path: str) -> bool  // 门卫：判断请求路径对应的插件是否处于启用状态。
+- refresh_status_from_db(self)  // 重新从 plugin_registry 读取各插件状态，刷新内存缓存中的 status。
+- get_info(self, identifier: str) -> Optional[PluginInfo]  // 获取插件信息（从缓存）
+
+== routes per top plugin ==
+- shop: 78 路由, 3870 loc
+- site_builder: 62 路由, 6744 loc
+- mini_app_builder: 45 路由, 5895 loc
+- vault: 40 路由, 5298 loc
+- analytics: 36 路由, 5732 loc
+- ali_api: 34 路由, 5980 loc
+- veroscholar: 32 路由, 5391 loc
+- content_factory: 31 路由, 1886 loc
+
+== entry files ==
+- run_comprehensive_test.py (544 loc): VeroRun AI 插件商店综合测试脚本
+- run_final_test_fixed.py (454 loc): None
+- run_full_test.py (411 loc): Generate JWT token and run comprehensive tests.
+- run_final_test_v2.py (402 loc): None
+- run_final_test.py (399 loc): None
+- auth_server.py (366 loc): auth-center standalone server (port 8081) - login/OAuth/user/CMS/payment + Main Site
+- health_guardian.py (270 loc): Health Guardian — 独立看门狗 (v2.0)
+- get_token_fixed2.py (92 loc): None
+- test_ssh_connect.py (58 loc): None
+- check_super_admin.py (56 loc): None
+- debug_login.py (52 loc): Debug the login and routing issues on the server.
+- debug_extended.py (51 loc): Debug login and find correct routes.
+
+== support_modules ==
+- plugin_manager.__init__: Plugin Manager — 插件管理核心模块
+- plugin_manager.audit: Plugin Manager — 插件审核引擎（AI 审核网关 · 批次2）
+- plugin_manager.config_validator: Plugin Manager — 配置 JSON Schema 校验
+- plugin_manager.coupons: Plugin Manager — 优惠券引擎
+- plugin_manager.deps: Plugin Manager — 增强依赖解析器
+- plugin_manager.downloader: Plugin Manager — Plugin Downloader
+- plugin_manager.event_bus: Plugin System — EventBus
+- plugin_manager.exceptions: Plugin Manager — 自定义异常
+- plugin_manager.guard: Plugin Manager — 运行时故障隔离守卫（P0-4）
+- plugin_manager.hooks: Plugin Manager — HookRegistry (Action + Filter 双钩子系统)
+- plugin_manager.injectors: Plugin Manager — 钩子植入点（系统关键路径 Hook 注入）
+- plugin_manager.license: Plugin Manager — License 引擎
+- plugin_manager.logger: Plugin Manager — 插件独立日志通道
+- plugin_manager.mcp: Plugin Manager — MCP 集成（stdio + Streamable HTTP 客户端）
+- plugin_manager.models: Plugin Manager — 数据库模型 & 数据类
+- plugin_manager.models_store: Plugin Manager — License & Store 数据库模型
+- plugin_manager.payment: Plugin Manager — 支付抽象接口 + 支付宝对接
+- plugin_manager.pricing: Plugin Manager — 定价机制引擎
+- plugin_manager.region: Region Router — 统一区域路由模块
+- plugin_manager.routes: Plugin Manager — 管理 API（供 Admin 后台调用）
+- plugin_manager.skill_availability: Skill Availability Resolver —— 技能可用性实时求值器（P0 核心）
+- plugin_manager.skill_registry: SkillRegistry —— 技能注册中心：安装记录 / 依赖反向索引 / 事件联动（P0）
+- plugin_manager.skills: Plugin Manager — 轻量技能层（Skill）
+- plugin_manager.store: Plugin Manager — 商店客户端
+- plugin_manager.store_importer: plugin_manager.store_importer — 商店元数据导入器（GitHub/Gitee 仓库 → Add Plugin 表单预填充）
+- plugin_manager.subscription: Plugin Manager — 订阅管理
+- plugin_manager.tagline: Plugin Manager — tagline 宣传语自动提取
+- plugin_manager.watermark: Plugin Manager — 官方插件水印/签名引擎

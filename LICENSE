@@ -1,0 +1,24 @@
+VeroRun Team Internal Use License
+=================================
+
+Copyright (c) 2026 VeroRun Team. All Rights Reserved.
+
+1. 授权范围
+   本软件（RepoLens，含 repo_lens 包及其附属脚本、文档）为 VeroRun 团队
+   内部开发辅助工具，仅授权 VeroRun 团队成员及经书面许可的协作方在内部
+   开发活动中使用、复制与修改。
+
+2. 限制
+   - 未经版权所有者书面许可，不得对外分发、出售、转授权或公开发布
+     本软件的任何部分；
+   - 不得移除或掩盖本声明及源码中的版权标识；
+   - 本软件按"现状"提供，不附带任何明示或默示的担保。
+
+3. 例外
+   本软件分析目标仓库所产出的报告与结构化数据（JSON / Markdown / HTML /
+   AI 上下文 / AGENTS.md 等）归运行者所有，不受上述限制约束。
+
+4. 开源计划
+   团队如决定开源，将以新的许可证全文替换本文件，并在 CHANGELOG 中记录。
+
+SPDX-License-Identifier: LicenseRef-VeroRun-Internal

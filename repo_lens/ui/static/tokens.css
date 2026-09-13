@@ -1,0 +1,172 @@
+/* RepoLens · UI 设计 token（像素级移植自 V1 桌面端设计稿）
+   仅含本工具实际用到的组件；颜色/圆角/阴影/字体与 V1 画布系统一致。 */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+/* ============ 设计 token（V1 暗色画布） ============ */
+.scr {
+  width:100%; height:100%; display:flex; flex-direction:column; overflow:hidden;
+  background:#0a0d11; color:#e8ecf1; min-height:100vh;
+  font-family:'IBM Plex Sans','Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  font-size:14px; line-height:1.5;
+  /* 工具级 token（复用 V1 .scr 系统） */
+  --sbg:#0a0d11; --spanel:#10141a; --spanel2:#161b23; --spanel3:#1e2530;
+  --sink:#e8ecf1; --sik2:#96a0ad; --sik3:#79838f;
+  --sline:rgba(255,255,255,0.07); --sline2:rgba(255,255,255,0.15);
+  --sac:#3ed6b5; --sac2:#17a98a; --sonac:#05251d; --saw:rgba(62,214,181,0.10);
+  --sok:#4ade80; --sokw:rgba(74,222,128,0.12);
+  --swarn:#fbbf24; --swarnw:rgba(251,191,36,0.12);
+  --sdgr:#f87171; --sdgrw:rgba(248,113,113,0.13);
+  --radius-sm:6px; --radius-md:10px; --radius-lg:14px;
+  --font-sans:'IBM Plex Sans','Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  --font-mono:'IBM Plex Mono','JetBrains Mono','Cascadia Code',Consolas,monospace;
+  --fast:120ms cubic-bezier(0.25,0.1,0.25,1); --norm:200ms cubic-bezier(0.25,0.1,0.25,1);
+}
+.scr.light {
+  --sbg:#f2f4f7; --spanel:#ffffff; --spanel2:#edf0f4; --spanel3:#e2e7ee;
+  --sink:#14181f; --sik2:#49505e; --sik3:#667080;
+  --sline:#e0e4ea; --sline2:#cbd2db;
+  --sac:#0c7d6c; --sac2:#0a6a5b; --sonac:#ffffff; --saw:rgba(12,125,108,0.09);
+  --sok:#15803d; --sokw:rgba(21,128,61,0.10); --swarn:#b45309; --swarnw:rgba(180,83,9,0.10); --sdgr:#d33131; --sdgrw:rgba(211,49,49,0.10);
+}
+.mono { font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+
+/* ============ 外壳：顶部窗口条 / 头部 / 侧栏 / 主区 / 状态条 ============ */
+.tbar { height:28px; flex:none; display:flex; align-items:center; gap:10px; padding:0 12px; background:var(--spanel); border-bottom:1px solid var(--sline); font-size:11px; color:var(--sik3); }
+.tbar .tbd { display:flex; align-items:center; gap:7px; font-weight:600; color:var(--sik2); }
+.tbar .winv { margin-left:auto; display:flex; gap:16px; }
+
+.hdr { height:48px; flex:none; display:flex; align-items:center; gap:12px; padding:0 14px; background:var(--spanel); border-bottom:1px solid var(--sline); }
+.brand { display:flex; align-items:center; gap:9px; min-width:180px; }
+.vmark { width:26px; height:26px; border-radius:7px; background:linear-gradient(135deg,var(--sac),var(--sac2)); display:flex; align-items:center; justify-content:center; color:var(--sonac); font-weight:700; font-size:14px; letter-spacing:-0.03em; flex:none; }
+.bname { font-weight:700; font-size:14.5px; letter-spacing:-0.01em; line-height:1.15; }
+.bsub { font-size:9.5px; color:var(--sik3); letter-spacing:0.09em; text-transform:uppercase; }
+.edchip { font-size:10.5px; font-weight:600; padding:2.5px 9px; border-radius:999px; background:var(--saw); color:var(--sac); border:1px solid var(--sline); white-space:nowrap; }
+.cmdbar { flex:1; max-width:500px; height:30px; margin:0 auto; display:flex; align-items:center; gap:8px; padding:0 8px 0 10px; background:var(--spanel2); border:1px solid var(--sline); border-radius:6px; color:var(--sik3); font-size:12.5px; min-width:150px; }
+.cmdbar kbd { margin-left:auto; font-family:var(--font-mono); font-size:9.5px; padding:1px 5px; border:1px solid var(--sline2); border-bottom-width:2px; border-radius:4px; color:var(--sik3); background:var(--spanel); }
+.hspace { flex:1; }
+.ibtn { width:28px; height:28px; flex:none; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; color:var(--sik2); cursor:pointer; }
+.ibtn:hover { background:rgba(255,255,255,0.06); color:var(--sink); }
+
+.sbody { flex:1; display:flex; min-height:0; }
+.sider { width:210px; flex:none; background:var(--spanel); border-right:1px solid var(--sline); padding:8px; display:flex; flex-direction:column; gap:1px; overflow:hidden; }
+.ng { margin:10px 9px 4px; font-size:10px; font-weight:700; letter-spacing:0.09em; color:var(--sik3); }
+.ni { display:flex; align-items:center; gap:9px; height:31px; padding:0 9px; border-radius:6px; color:var(--sik2); font-size:13px; cursor:pointer; user-select:none; }
+.ni:hover { background:rgba(255,255,255,0.04); color:var(--sink); }
+.ni.on { background:var(--saw); color:var(--sac); font-weight:600; }
+.ni.dis { opacity:0.35; }
+.ni .cnt { margin-left:auto; font-family:var(--font-mono); font-size:10px; color:var(--sik3); }
+.sider .sfoot { margin-top:auto; display:flex; align-items:center; gap:8px; padding:8px 9px 4px; font-size:10.5px; color:var(--sik3); border-top:1px solid var(--sline); }
+
+.smain { flex:1; min-width:0; overflow:auto; padding:18px 20px; display:flex; flex-direction:column; gap:14px; }
+.smain.flat { padding:0; overflow:hidden; }
+.phead { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:2px; }
+.h1 { font-size:20px; font-weight:700; letter-spacing:-0.01em; }
+.psub { font-size:12.5px; color:var(--sik3); margin-top:2px; }
+.pact { display:flex; gap:8px; align-items:center; }
+
+/* ============ 通用组件（V1 设计系统） ============ */
+.btn { display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 13px; border-radius:6px; font-size:12.5px; font-weight:600; border:1px solid transparent; white-space:nowrap; cursor:pointer; background:var(--spanel2); color:var(--sink); }
+.btn:hover { border-color:var(--sline2); }
+.btn:active { transform:translateY(1px); }
+.btn:disabled { opacity:.45; cursor:not-allowed; }
+.btn-pri { background:var(--sac); color:var(--sonac); }
+.btn-pri:hover { filter:brightness(1.06); }
+.btn-sec { background:var(--spanel); border-color:var(--sline2); color:var(--sink); }
+.btn-gho { color:var(--sik2); background:transparent; }
+.btn.warn { border-color:rgba(248,113,113,0.4); color:var(--sdgr); }
+.btn-sm { height:24px; padding:0 10px; font-size:11.5px; border-radius:5px; }
+.dis { opacity:.4; }
+
+.card { background:var(--spanel); border:1px solid var(--sline); border-radius:10px; }
+.chead { padding:11px 14px; border-bottom:1px solid var(--sline); display:flex; align-items:center; gap:8px; }
+.ctitle { font-size:13px; font-weight:600; }
+.csub { font-size:11px; color:var(--sik3); margin-left:auto; font-family:var(--font-mono); }
+.cbody { padding:14px; }
+
+.metric { background:var(--spanel); border:1px solid var(--sline); border-radius:10px; padding:13px 14px; display:flex; flex-direction:column; gap:7px; position:relative; min-width:150px; }
+.metric b { font-family:var(--font-mono); font-size:24px; font-weight:600; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; line-height:1.1; }
+.metric span { font-size:11px; color:var(--sik3); }
+.mtop { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--sik2); }
+.mico { width:26px; height:26px; border-radius:7px; display:flex; align-items:center; justify-content:center; background:var(--saw); color:var(--sac); flex:none; }
+.mval { font-family:var(--font-mono); font-size:24px; font-weight:600; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; line-height:1.1; }
+.mfoot { font-size:11px; color:var(--sik3); display:flex; align-items:center; gap:5px; }
+.up { color:var(--sok); }
+
+.pill { display:inline-flex; align-items:center; gap:5px; height:20px; padding:0 8px; border-radius:999px; font-size:11px; font-weight:600; white-space:nowrap; }
+.pill .d { width:5px; height:5px; border-radius:50%; background:currentColor; flex:none; }
+.p-ok { background:var(--sokw); color:var(--sok); }
+.p-run { background:var(--saw); color:var(--sac); }
+.p-warn { background:var(--swarnw); color:var(--swarn); }
+.p-dgr { background:var(--sdgrw); color:var(--sdgr); }
+.p-mut { background:var(--spanel2); color:var(--sik3); }
+
+.bar { height:4px; border-radius:99px; background:var(--spanel3); overflow:hidden; width:64px; flex:none; }
+.bar i { display:block; height:100%; border-radius:99px; background:var(--sac); }
+
+.sbar { height:26px; flex:none; display:flex; align-items:center; gap:14px; padding:0 14px; background:var(--spanel); border-top:1px solid var(--sline); font-size:11px; color:var(--sik3); }
+.sbar .sgap { flex:1; }
+.sgroup { display:flex; align-items:center; gap:6px; }
+.chip { display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 11px; border-radius:999px; border:1px solid var(--sline); font-size:11.5px; color:var(--sik2); background:var(--spanel); }
+.chip.on { background:var(--saw); color:var(--sac); border-color:transparent; font-weight:600; }
+.chip .n { font-family:var(--font-mono); font-size:10px; opacity:.75; }
+.sinp { display:flex; align-items:center; gap:7px; height:28px; padding:0 10px; border-radius:6px; border:1px solid var(--sline); background:var(--spanel2); color:var(--sik3); font-size:12px; min-width:180px; }
+.tagi { display:inline-flex; align-items:center; height:19px; padding:0 7px; border-radius:4px; background:var(--spanel2); border:1px solid var(--sline); font-size:10.5px; color:var(--sik2); white-space:nowrap; }
+.ftag { display:inline-flex; align-items:center; height:18px; padding:0 7px; border-radius:4px; font-size:10.5px; font-weight:600; background:var(--saw); color:var(--sac); white-space:nowrap; }
+.opbadge { display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 9px; border-radius:5px; background:var(--spanel3); color:var(--sik2); font-size:10.5px; font-weight:600; letter-spacing:0.04em; white-space:nowrap; }
+
+.dotp { width:7px; height:7px; border-radius:50%; position:relative; flex:none; }
+.dotp::after { content:''; position:absolute; inset:-3px; border-radius:50%; border:1px solid currentColor; opacity:.5; animation:vrp 2.2s ease-out infinite; }
+.dotp.ok { background:var(--sok); color:var(--sok); }
+.dotp.run { background:var(--sac); color:var(--sac); }
+.dotp.warn { background:var(--swarn); color:var(--swarn); }
+.dotp.off { background:var(--sik3); color:var(--sik3); }
+.dotp.off::after { animation:none; opacity:0; }
+@keyframes vrp { 0% { transform:scale(0.5); opacity:.7; } 70% { transform:scale(1.3); opacity:0; } 100% { transform:scale(1.3); opacity:0; } }
+
+/* ============ 工具层（沿用原控制台组件，套用 V1 token） ============ */
+.panel { background:var(--spanel); border:1px solid var(--sline); border-radius:var(--radius-md); padding:1rem 1.15rem; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:.7rem; }
+.toolbar { display:flex; flex-wrap:wrap; gap:.55rem; align-items:center; margin:.2rem 0 .4rem; }
+.hint { color:var(--sik3); font-size:.74rem; line-height:1.6; }
+.err { color:var(--sdgr); font-size:.84rem; margin-top:.3rem; }
+#busy { display:none; color:var(--sac); font-size:.8rem; }
+.auto { display:inline-flex; gap:.35rem; align-items:center; font-size:.76rem; color:var(--sik3); cursor:pointer; user-select:none; }
+
+/* 仪表盘指标卡沿用 .metric，但在这里用 <b>/<span> 语义 */
+.grid .metric b { font-size:1.45rem; letter-spacing:-.02em; }
+.grid .metric span { color:var(--sik3); font-size:.72rem; }
+
+table.tb { width:100%; border-collapse:collapse; font-size:12.5px; margin:.45rem 0; background:var(--spanel); border:1px solid var(--sline); border-radius:var(--radius-md); overflow:hidden; }
+.tb th { text-align:left; font-size:10.5px; font-weight:600; letter-spacing:0.07em; text-transform:uppercase; color:var(--sik3); padding:8px 14px; border-bottom:1px solid var(--sline); background:var(--spanel2); white-space:nowrap; }
+.tb td { padding:9px 14px; border-bottom:1px solid var(--sline); white-space:nowrap; }
+.tb tr:last-child td { border-bottom:none; }
+.tb .tmono { font-family:var(--font-mono); font-size:11.5px; color:var(--sik2); font-variant-numeric:tabular-nums; }
+td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
+.tb .ok { color:var(--sok); font-weight:600; }
+.tb .bad { color:var(--sdgr); font-weight:600; }
+
+/* 兼容原控制台直接生成的裸 <table>（无 .tb 类） */
+.smain table:not(.tb) { width:100%; border-collapse:collapse; font-size:.78rem; background:var(--spanel); border:1px solid var(--sline); border-radius:var(--radius-md); overflow:hidden; margin:.45rem 0; }
+.smain table:not(.tb) th { text-align:left; font-size:.66rem; color:var(--sik3); background:var(--spanel2); padding:.45rem .6rem; border-bottom:1px solid var(--sline); font-weight:600; letter-spacing:.03em; }
+.smain table:not(.tb) td { padding:.42rem .6rem; border-bottom:1px solid rgba(255,255,255,0.04); vertical-align:middle; }
+.smain table:not(.tb) tbody tr:last-child td { border-bottom:none; }
+.smain table:not(.tb) tbody tr:hover { background:rgba(255,255,255,0.03); }
+
+.smain h2 { font-size:1.02rem; margin:1.2rem 0 .6rem; display:flex; align-items:center; gap:.45rem; color:var(--sink); }
+.smain h2:first-child { margin-top:0; }
+.smain h3 { font-size:.92rem; margin:1rem 0 .4rem; color:var(--sink); }
+.smain p { margin:.4rem 0; line-height:1.7; }
+
+code { background:var(--spanel2); padding:.06rem .4rem; border-radius:5px; font-family:var(--font-mono); font-size:.92em; color:var(--sink); }
+a { color:var(--sac); text-decoration:none; } a:hover { text-decoration:underline; }
+pre { background:#0d1117; color:#c9d1d9; border-radius:var(--radius-md); padding:.8rem 1rem; overflow:auto; font-size:.76rem; line-height:1.5; max-height:26rem; white-space:pre-wrap; word-break:break-word; }
+iframe { width:100%; height:68vh; border:1px solid var(--sline); border-radius:var(--radius-md); background:#fff; }
+ul.plain { list-style:none; padding:0; margin:.4rem 0; font-size:.78rem; }
+ul.plain li { padding:.3rem .6rem; border-bottom:1px dashed rgba(255,255,255,0.06); }
+ul.plain li:last-child { border-bottom:none; }
+input, select { font:inherit; border:1px solid var(--sline2); border-radius:8px; padding:.36rem .6rem; background:var(--spanel2); color:var(--sink); }
+input:focus, select:focus { outline:none; border-color:var(--sac); box-shadow:0 0 0 2px var(--saw); }
+.querybar { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; margin-top:.5rem; }
+.querybar input[type=text] { flex:1; min-width:160px; }
+.foot { color:var(--sik3); font-size:.72rem; max-width:1180px; margin:0 auto; padding:0 1.2rem 2rem; display:flex; justify-content:space-between; flex-wrap:wrap; gap:.4rem; }
+@media(max-width:640px){ .sider{width:auto} .tmeta{text-align:left;width:100%} .topbar{gap:.4rem} }

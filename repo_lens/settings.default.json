@@ -1,0 +1,50 @@
+{
+  "mcp_enabled": true,
+  "mcp_outbound_enabled": true,
+  "mcp_servers": [],
+  "llm_enabled": false,
+  "default_model": null,
+  "models": [],
+  "max_plugins_in_ai_context": 60,
+  "max_tree_depth": 2,
+  "output": {
+    "date_dir": true,
+    "date_format": "%Y-%m-%d",
+    "agents_md": "workspace"
+  },
+  "analysis": {
+    "workers": 0
+  },
+  "packs": {
+    "enabled": null
+  },
+  "llm": {
+    "timeout_s": 30,
+    "max_retries": 2,
+    "max_tool_rounds": 3,
+    "use_tools": true,
+    "temperature": 0.0
+  },
+  "profile": {
+    "name": "verorun",
+    "repo_signature": {
+      "dirs": ["plugins", "plugin_manager"],
+      "files": []
+    },
+    "component": {
+      "dir": "plugins",
+      "manifest": "plugin.json",
+      "required_fields": ["identifier", "name", "version", "description",
+                          "author", "min_app_version", "agent_role", "capabilities"],
+      "id_pattern": "^[a-z0-9_]+$"
+    },
+    "core_modules": null,
+    "auto_core_exclude": ["docs", "deploy", "scripts", "tools"],
+    "exclude_dirs": null,
+    "root_entry_allowlist": null,
+    "key_docs": null,
+    "standard_doc_pattern": "docs/plugin-standard-v*.md",
+    "frontend_repo_names": ["verorun-workplace"],
+    "default_gates": null
+  }
+}
