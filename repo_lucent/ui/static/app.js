@@ -39,7 +39,7 @@
   // ---- 侧栏与路由 ----
   const NAV = [
     ['分析', [['dashboard', '仪表盘', 'grid'], ['query', '结构化查询', 'filter'], ['gate', '架构门禁', 'shield']]],
-    ['资产', [['scripts', '脚本库', 'puzzle'], ['git', '版本控制', 'git'], ['audit', '代码审计', 'shieldok']]],
+    ['资产', [['scripts', '脚本库', 'puzzle'], ['git', '版本控制', 'git'], ['audit', '代码审计', 'shieldok'], ['projects', '项目', 'rows']]],
     ['系统', [['settings', '设置', 'gear']]]
   ];
 
@@ -121,7 +121,8 @@
           '<span class="cact"><button class="btn" onclick="VRApp.groupsLoad()">刷新组</button></span></div>' +
           '<div class="cbody">' +
           '<div class="toolbar">组名 <input type="text" id="grpName" placeholder="group" style="width:8rem"> ' +
-          '仓库路径 <input type="text" id="grpRepo" placeholder="D:\\path\\to\\repo" style="width:20rem"> ' +
+          '仓库路径 <input type="text" id="grpRepo" placeholder="D:\\path\\to\\repo" style="width:18rem"> ' +
+          '<button class="btn" onclick="VRApp.openPathPicker(\'grpRepo\')">点选</button> ' +
           '<button class="btn" onclick="VRApp.groupAdd(false)">添加预检</button>' +
           '<button class="btn warn" onclick="VRApp.groupAdd(true)">确认添加</button>' +
           '<button class="btn warn" onclick="VRApp.groupRemove(true)">移除</button></div>' +
@@ -130,6 +131,37 @@
           '<button class="btn" onclick="VRApp.batchRun()">执行 batch</button></div>' +
           '<div id="groupsOut"></div></div></section>',
         mount() { groupsLoad(); }
+      };
+    },
+    projects() {
+      return {
+        html:
+          '<div class="phead"><div><div class="h1">项目分组</div><div class="psub">项目 = 多个仓库/路径的统计聚合（如 verorun-core + verorun-desktop）· 成员可登记子范围（如 plugins）做仓库内单独统计 · 汇总只读已有产物，分析需显式点击</div></div></div>' +
+          '<section class="card"><div class="chead"><span class="ctitle">项目</span>' +
+          '<span class="cact"><button class="btn" onclick="VRApp.projLoad()">刷新项目</button></span></div>' +
+          '<div class="cbody">' +
+          '<div class="toolbar">项目 <select id="projSel" onchange="VRApp.projSummary()"></select> ' +
+          '新建 <input type="text" id="projName" placeholder="如 VeroRun" style="width:10rem"> ' +
+          '<button class="btn" onclick="VRApp.projAdd(false)">预检</button>' +
+          '<button class="btn warn" onclick="VRApp.projAdd(true)">创建</button>' +
+          '<button class="btn warn" onclick="VRApp.projRemove()">删除选中</button></div>' +
+          '<div id="projOut" class="hint">加载中…</div></div></section>' +
+          '<section class="card"><div class="chead"><span class="ctitle">成员与统计</span>' +
+          '<span class="cact"><button class="btn" onclick="VRApp.projSummary()">刷新统计</button></span></div>' +
+          '<div class="cbody">' +
+          '<div class="toolbar">成员名 <input type="text" id="pmName" placeholder="如 verorun-core" style="width:11rem"> ' +
+          '路径 <input type="text" id="pmPath" placeholder="D:\\path\\to\\repo" style="width:16rem"> ' +
+          '<button class="btn" onclick="VRApp.openPathPicker(\'pmPath\')">点选</button> ' +
+          '预设 <select id="pmProfile" style="width:9rem"></select> ' +
+          '子范围 <input type="text" id="pmScopes" placeholder="plugins,docs（逗号分隔，可空）" style="width:13rem"></div>' +
+          '<div class="toolbar"><button class="btn" onclick="VRApp.projMemberAdd(false)">添加预检</button>' +
+          '<button class="btn warn" onclick="VRApp.projMemberAdd(true)">确认添加</button>' +
+          '<span class="hint">分析为大目录串行长任务：逐成员点「分析」，完成即刷新统计</span></div>' +
+          '<div id="pmOut"></div></div></section>',
+        mount() {
+          projLoad();
+          api('/api/repos').then(d => { const sel = $('pmProfile'); if (sel) { const cur = sel.value; sel.innerHTML = (d.profiles || []).map(p => '<option' + (p === 'verorun' || p === cur ? ' selected' : '') + '>' + esc(p) + '</option>').join(''); } }).catch(() => {});
+        }
       };
     },
     scripts() {
@@ -198,7 +230,8 @@
           '<div class="cbody">' +
           '<div id="reposOut" class="hint">加载中…</div>' +
           '<div class="toolbar" style="margin-top:.6rem">名称 <input type="text" id="repoName" placeholder="如 verorun" style="width:8rem"> ' +
-          '路径 <input type="text" id="repoPath" placeholder="D:\\projects\\my-repo" style="width:22rem"> ' +
+          '路径 <input type="text" id="repoPath" placeholder="D:\\projects\\my-repo" style="width:20rem"> ' +
+          '<button class="btn" onclick="VRApp.openPathPicker(\'repoPath\')">点选</button> ' +
           '预设 <select id="repoProfile" style="width:10rem"></select> ' +
           '<button class="btn" onclick="VRApp.reposAdd(false)">预检</button>' +
           '<button class="btn warn" onclick="VRApp.reposAdd(true)">注册</button></div>' +
@@ -212,7 +245,7 @@
           '</div></section>' +
           '<section class="card"><div class="chead"><span class="ctitle">Agent 端点索引</span><span class="csub" id="setVer">—</span></div>' +
           '<div class="cbody"><p class="hint">Agent 可用 HTTP 直连以下端点：<br>' +
-          '<code>/api/analyze</code> · <code>/api/summary</code> · <code>/api/snapshot</code> · <code>/api/diff</code> · <code>/api/query</code> · <code>/api/gate</code> · <code>/api/ai</code> · <code>/api/git/*</code> · <code>/api/scripts/*</code> · <code>/api/audit/*</code> · <code>/api/settings</code> · <code>/api/repos/*</code> · <code>/api/batch</code> · <code>/api/mcp-out/*</code> · <code>/mcp</code>（MCP over HTTP）</p>' +
+          '<code>/api/analyze</code> · <code>/api/summary</code> · <code>/api/snapshot</code> · <code>/api/diff</code> · <code>/api/query</code> · <code>/api/gate</code> · <code>/api/ai</code> · <code>/api/git/*</code> · <code>/api/scripts/*</code> · <code>/api/audit/*</code> · <code>/api/settings</code> · <code>/api/repos/*</code> · <code>/api/fs/list</code> · <code>/api/projects/*</code> · <code>/api/batch</code> · <code>/api/mcp-out/*</code> · <code>/mcp</code>（MCP over HTTP）</p>' +
           '</div></section>',
         mount() { loadSettings(); llmFormFill(); reposLoad(); artifactsLoad(); api('/api/state').then(s => { const e = $('setVer'); if (e) e.textContent = 'v' + (s.tool_version || '?'); }).catch(() => {}); }
       };
@@ -395,6 +428,153 @@
   async function reposSwitch(name) { busy(1); try { const r = await api('/api/repos/switch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name }) }); msg('已切换到 ' + name + '（预设 ' + (r.profile || 'verorun') + '）；请到仪表盘点「刷新」重新分析', false); await reposLoad(); } catch (e) { msg(e.message); } busy(0); }
   async function reposRemove(name) { if (!window.confirm('移除注册项 ' + name + '？（不影响磁盘文件）')) return; busy(1); try { await api('/api/repos/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, confirm: true }) }); msg('已移除 ' + name, false); await reposLoad(); } catch (e) { msg(e.message); } busy(0); }
 
+  // ---- 路径点选（目录选择器，三处复用：多仓库/仓库组/项目成员）----
+  function _ppEnsure() {
+    if ($('ppOverlay')) return;
+    document.body.insertAdjacentHTML('beforeend',
+      '<div id="ppOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999;align-items:center;justify-content:center">' +
+      '<div style="background:var(--spanel,#161a21);color:var(--sink,#dfe3ea);border:1px solid var(--sline2,rgba(255,255,255,.12));border-radius:12px;width:min(560px,92vw);max-height:72vh;display:flex;flex-direction:column;padding:1rem">' +
+      '<div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.6rem"><b>选择目录</b>' +
+      '<span id="ppCrumb" class="hint" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>' +
+      '<button class="btn" onclick="VRApp.ppClose()">关闭</button></div>' +
+      '<div id="ppList" style="flex:1;overflow:auto;border:1px solid var(--sline2,rgba(255,255,255,.12));border-radius:8px;padding:.4rem"></div>' +
+      '<div class="toolbar" style="margin-top:.6rem"><button class="btn btn-pri" id="ppUse" onclick="VRApp.ppUse()">使用此目录</button>' +
+      '<button class="btn" id="ppUp" onclick="VRApp.ppUp()">上一级</button>' +
+      '<span class="hint">⑂ = 含 .git 的仓库目录</span></div></div></div>');
+  }
+  function _attr(s) { return esc(String(s == null ? '' : s).replace(/"/g, '&quot;')); }
+  let _ppTarget = null, _ppCur = null, _ppParent = null;
+  async function openPathPicker(inputId) {
+    _ppEnsure(); _ppTarget = inputId;
+    await ppRender(null);
+    $('ppOverlay').style.display = 'flex';
+  }
+  async function ppRender(path) {
+    let d;
+    try { d = await api('/api/fs/list' + (path ? '?path=' + encodeURIComponent(path) : '')); }
+    catch (e) { msg(e.message); return; }
+    _ppCur = d.path; _ppParent = d.parent;
+    $('ppCrumb').textContent = d.path || '（起点：选择盘符或用户目录）';
+    $('ppUse').disabled = !d.path;
+    $('ppUp').disabled = !d.parent;
+    let h = '';
+    if (d.path == null) {
+      (d.roots || []).forEach(r => { h += '<div data-pp="' + _attr(r) + '" style="cursor:pointer;padding:.35rem .5rem;border-radius:6px">💾 ' + esc(r) + '</div>'; });
+      h += '<div data-pp="' + _attr(d.home) + '" style="cursor:pointer;padding:.35rem .5rem;border-radius:6px">🏠 ' + esc(d.home) + '（用户目录）</div>';
+    } else {
+      (d.dirs || []).forEach(x => { h += '<div data-pp="' + _attr(x.path) + '" style="cursor:pointer;padding:.35rem .5rem;border-radius:6px">' + (x.is_repo ? '⑂ ' : '📁 ') + esc(x.name) + '</div>'; });
+      if (!(d.dirs || []).length) h += '<p class="hint">（无子目录）</p>';
+      if (d.truncated) h += '<p class="hint">（子目录过多已截断，请进入更深层级）</p>';
+    }
+    const list = $('ppList'); list.innerHTML = h;
+    list.querySelectorAll('[data-pp]').forEach(el => {
+      el.addEventListener('click', () => ppRender(el.getAttribute('data-pp')));
+      el.addEventListener('mouseover', () => { el.style.background = 'var(--sline,rgba(255,255,255,.07))'; });
+      el.addEventListener('mouseout', () => { el.style.background = ''; });
+    });
+  }
+  function ppUse() { const inp = _ppTarget ? $(_ppTarget) : null; if (inp && _ppCur) inp.value = _ppCur; ppClose(); }
+  function ppClose() { const ov = $('ppOverlay'); if (ov) ov.style.display = 'none'; }
+
+  // ---- 项目分组（projects 视图）----
+  async function projLoad() {
+    busy(1);
+    try {
+      const d = await api('/api/projects');
+      const sel = $('projSel');
+      if (sel) { const cur = sel.value; sel.innerHTML = (d.projects || []).map(p => '<option' + (p.name === cur ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('') || '<option value="">（无项目）</option>'; }
+      const o = $('projOut');
+      if (o) {
+        let h = '<p>注册表：<code>' + esc(d.path || '') + '</code></p>';
+        if ((d.projects || []).length) h += '<ul class="plain">' + d.projects.map(p => '<li><b>' + esc(p.name) + '</b> · ' + ((p.repos || []).length) + ' 个成员</li>').join('') + '</ul>';
+        else h += '<p class="hint">（暂无项目；用上方表单创建）</p>';
+        o.innerHTML = h;
+      }
+      await projSummary();
+      msg('项目列表已刷新', false);
+    } catch (e) { msg(e.message); } busy(0);
+  }
+  async function projAdd(confirm) {
+    const nm = $('projName'); if (!nm || !nm.value.trim()) { msg('请填写项目名'); return; }
+    const name = nm.value.trim();
+    busy(1);
+    try { await api('/api/projects/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, confirm: confirm }) });
+      if (confirm) { nm.value = ''; const sel = $('projSel'); if (sel) sel.value = name; await projLoad(); }  // 创建后自动选中新项目
+      msg(confirm ? '项目已创建' : '预检通过（再点「创建」写入）', false);
+    } catch (e) { msg(e.message); } busy(0);
+  }
+  async function projRemove() {
+    const sel = $('projSel'); const name = sel ? sel.value : '';
+    if (!name) { msg('暂无项目'); return; }
+    if (!window.confirm('删除项目 ' + name + '？（不影响磁盘与分析产物）')) return;
+    busy(1);
+    try { await api('/api/projects/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, confirm: true }) }); msg('已删除 ' + name, false); await projLoad(); }
+    catch (e) { msg(e.message); } busy(0);
+  }
+  async function projMemberAdd(confirm) {
+    const sel = $('projSel'); const proj = sel ? sel.value : '';
+    if (!proj) { msg('请先创建项目'); return; }
+    const nm = $('pmName'), pa = $('pmPath'), pf = $('pmProfile'), sc = $('pmScopes');
+    if (!nm || !nm.value.trim() || !pa || !pa.value.trim()) { msg('请填写成员名与路径'); return; }
+    const scopes = (sc && sc.value.trim()) ? sc.value.split(',').map(x => x.trim()).filter(Boolean) : [];
+    busy(1);
+    try {
+      const r = await api('/api/projects/repos/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: proj, name: nm.value.trim(), path: pa.value.trim(), profile: (pf && pf.value !== 'verorun' ? pf.value : null), scopes: scopes, confirm: confirm }) });
+      if (!confirm) msg('预检通过：子范围 ' + ((r.scopes || []).join('、') || '（无）'), false);
+      else { nm.value = ''; pa.value = ''; if (sc) sc.value = ''; await projLoad(); }
+    } catch (e) { msg(e.message); } busy(0);
+  }
+  async function projMemberRemove(name) {
+    const sel = $('projSel'); const proj = sel ? sel.value : '';
+    if (!proj) return;
+    if (!window.confirm('从项目移除成员 ' + name + '？（不影响磁盘与分析产物）')) return;
+    busy(1);
+    try { await api('/api/projects/repos/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: proj, name: name, confirm: true }) }); await projLoad(); }
+    catch (e) { msg(e.message); } busy(0);
+  }
+  async function projSummary() {
+    const sel = $('projSel'); const name = sel ? sel.value : '';
+    const o = $('pmOut'); if (!o) return;
+    if (!name) { o.innerHTML = '<p class="hint">（暂无项目）</p>'; return; }
+    try {
+      const d = await api('/api/projects/summary?name=' + encodeURIComponent(name));
+      const ms = d.members || [];
+      const cell = row => (row.status === 'analyzed' && row.summary) ? [row.summary.files, row.summary.lines_code, row.summary.core_modules, row.summary.plugins, row.summary.routes_total] : null;
+      let h = '<h3>项目 ' + esc(name) + ' · 成员统计</h3><table class="tb"><tr><th>目标</th><th>路径</th><th>状态</th><th class="num">文件</th><th class="num">代码行</th><th class="num">核心</th><th class="num">插件</th><th class="num">路由</th><th>操作</th></tr>';
+      let tot = [0, 0, 0, 0, 0], any = false;
+      ms.forEach(m => {
+        const c = cell(m);
+        if (c) { any = true; for (let i = 0; i < 5; i++) tot[i] += (+c[i] || 0); }
+        h += '<tr><td><code>' + esc(m.name) + '</code></td><td class="hint">' + esc(m.path) + '</td><td class="' + (m.status === 'analyzed' ? 'ok' : '') + '">' + (m.status === 'analyzed' ? '✓ 已分析' : '未分析') + '</td>' +
+          (c ? '<td class="num">' + c[0] + '</td><td class="num">' + (+c[1]).toLocaleString() + '</td><td class="num">' + c[2] + '</td><td class="num">' + c[3] + '</td><td class="num">' + c[4] + '</td>' : '<td colspan="5" class="hint">—（点「分析」生成）</td>') +
+          '<td><button class="btn" onclick="VRApp.projAnalyze(\'' + esc(m.name) + '\')">分析</button> <button class="btn warn" onclick="VRApp.projMemberRemove(\'' + esc(m.name) + '\')">移除</button></td></tr>';
+        (m.scopes || []).forEach(s => {
+          const c2 = cell(s);
+          h += '<tr><td>└ <code>' + esc(s.name) + '</code></td><td class="hint">目录口径（无插件识别）</td><td class="' + (s.status === 'analyzed' ? 'ok' : '') + '">' + (s.status === 'analyzed' ? '✓' : '未分析') + '</td>' +
+            (c2 ? '<td class="num">' + c2[0] + '</td><td class="num">' + (+c2[1]).toLocaleString() + '</td><td class="num">' + c2[2] + '</td><td class="num">' + c2[3] + '</td><td class="num">' + c2[4] + '</td>' : '<td colspan="5" class="hint">—</td>') +
+            '<td><button class="btn" onclick="VRApp.projAnalyze(\'' + esc(m.name) + '\',\'' + esc(s.name) + '\')">分析</button></td></tr>';
+        });
+      });
+      if (any) h += '<tr><th colspan="3">合计（成员级，不含子范围避免重复计数）</th><th class="num">' + tot[0] + '</th><th class="num">' + tot[1].toLocaleString() + '</th><th class="num">' + tot[2] + '</th><th class="num">' + tot[3] + '</th><th class="num">' + tot[4] + '</th><th></th></tr>';
+      h += '</table>';
+      if (!ms.length) h += '<p class="hint">（项目暂无成员；用上方表单添加）</p>';
+      o.innerHTML = h;
+    } catch (e) { o.innerHTML = '<span class="err">' + esc(e.message) + '</span>'; }
+  }
+  async function projAnalyze(member, scope) {
+    const sel = $('projSel'); const proj = sel ? sel.value : '';
+    if (!proj) return;
+    busy(1);
+    try {
+      const body = { project: proj, member: member, only: 'json,md' };
+      if (scope) body.scope = scope;
+      const r = await api('/api/projects/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const s = r.summary || {};
+      msg('分析完成 ' + r.target + '：文件 ' + s.files + ' · 代码行 ' + (+(s.lines_code || 0)).toLocaleString(), false);
+      await projSummary();
+    } catch (e) { msg(e.message); } busy(0);
+  }
+
   // ---- 暴露给 onclick 的属性 ----
   window.VRApp = {
     run, snapshot, diff, gate, ai, query, toggleAuto,
@@ -403,8 +583,12 @@
     loadScripts, scriptDetail, scriptRun, scriptDoctor, scriptManual, scriptBaseline, scriptBaselineDiff,
     auditPreview, auditRun, auditSemPrompt, auditRunWithSemantic,
     loadSettings, mcpOutServers, mcpOutTools, mcpOutCall, llmFormFill, llmSave,
-    reposLoad, reposAdd, reposSwitch, reposRemove, summary, artifactsLoad
+    reposLoad, reposAdd, reposSwitch, reposRemove, summary, artifactsLoad,
+    openPathPicker, ppRender, ppUse, ppClose,
+    projLoad, projAdd, projRemove, projSummary, projMemberAdd, projMemberRemove, projAnalyze
   };
+  // ppUp 由 ppRender 状态驱动：暴露同一入口
+  window.VRApp.ppUp = function () { if (_ppParent) ppRender(_ppParent); };
 
   // ---- 启动 ----
   window.addEventListener('hashchange', route);
