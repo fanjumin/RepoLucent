@@ -284,7 +284,7 @@
         "bloat"
       ],
       "origin": {
-        "source_path": "F:/共享文件夹/verorun-dev-insight/tests/bloat_analysis.py + bloat_recent.py",
+        "source_path": "F:/共享文件夹/RepoLucent/tests/bloat_analysis.py + bloat_recent.py",
         "source_sha256": "231738e05cad5d40 / 8121a447119bee88",
         "extracted_at": "2026-09-12"
       }
@@ -437,7 +437,7 @@
         "ast"
       ],
       "origin": {
-        "source_path": "verorun-dev-insight/script_sweep_prototypes/{inventory.py,score.py}",
+        "source_path": "RepoLucent/script_sweep_prototypes/{inventory.py,score.py}",
         "source_sha256": null,
         "extracted_at": "2026-09-12"
       }
@@ -468,7 +468,7 @@
       "summary": "读工具产出的 repo_lens.json 按语言/目录解释行数来源，绑本次审计 JSON。",
       "entry": null,
       "origin": {
-        "source_path": "F:/共享文件夹/verorun-dev-insight/tests/attribution.py",
+        "source_path": "F:/共享文件夹/RepoLucent/tests/attribution.py",
         "source_sha256": "7068dc14465c2a34",
         "extracted_at": "2026-09-12"
       }

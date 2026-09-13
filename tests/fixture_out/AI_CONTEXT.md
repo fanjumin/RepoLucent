@@ -1,6 +1,6 @@
 # VeroRun AI 开发上下文（自动生成）
 
-> 生成：verorun-dev-insight v1.2.0 · 2026-09-09 10:55:36 · 仓库 `C:\Users\jumin\.openclaw-autoclaw\workspace\projects\verorun-dev-insight\tests\fixture_repo`
+> 生成：RepoLucent v1.2.0 · 2026-09-09 10:55:36 · 仓库 `C:\Users\jumin\.openclaw-autoclaw\workspace\projects\RepoLucent\tests\fixture_repo`
 > 用途：把本文件作为 AI 助手的上下文，代替通读 VeroRun 源码。开发前只需提供本文件。
 
 ## 1. 系统架构（系统核心 = 平台引擎；业务插件 = 可插拔能力）

@@ -1,6 +1,6 @@
 # VeroRun AI 系统架构洞察报告
 
-> 由 verorun-dev-insight v1.2.0 自动生成 · 2026-09-09 10:55:36 · 仓库 `C:\Users\jumin\.openclaw-autoclaw\workspace\projects\verorun-dev-insight\tests\fixture_repo` · 耗时 55 ms
+> 由 RepoLucent v1.2.0 自动生成 · 2026-09-09 10:55:36 · 仓库 `C:\Users\jumin\.openclaw-autoclaw\workspace\projects\RepoLucent\tests\fixture_repo` · 耗时 55 ms
 
 ## 1. 总览
 

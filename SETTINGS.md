@@ -5,7 +5,7 @@
 ## 1. 设计原则
 
 1. **向后兼容（最高优先）**：无 `settings.json` 时，行为与旧版完全一致。
-2. **优先级链（低 → 高）**：包内默认 < 用户级 `~/.verorun-dev-insight/settings.json` < 项目级 `<tool>/settings.json` < 环境变量 `REPO_LENS_SETTINGS` 指向的文件。
+2. **优先级链（低 → 高）**：包内默认 < 用户级 `~/.repolucent/settings.json` < 项目级 `<tool>/settings.json` < 环境变量 `REPO_LENS_SETTINGS` 指向的文件。
 3. **密钥隔离**：`api_key` / `base_url` 等敏感项**只**从环境变量 `REPO_LENS_*` 读取；`settings.json` 只承载非敏感配置。
 4. **兼容契约**：`settings` 字段均为可选、MINOR 级；消费方忽略未知字段（沿用 `__init__.py` 的 `SCHEMA_VERSION`）。
 5. **零第三方依赖**：仅标准库（`json` / `os` / `pathlib`）。
@@ -17,7 +17,7 @@
 | 优先级 | 路径 | 说明 |
 |---|---|---|
 | 1（最低） | `<pkg>/settings.default.json` | 随包发布的内置默认，作为兜底 |
-| 2 | `~/.repolens/settings.json`（旧 `~/.verorun-dev-insight/` 兼容回落） | 用户级全局配置 |
+| 2 | `~/.repolens/settings.json`（旧 `~/.repolucent/` 兼容回落） | 用户级全局配置 |
 | 3 | `<tool 项目根>/settings.json` | 项目级配置 |
 | 4（最高） | `REPO_LENS_SETTINGS` 环境变量指向的文件 | 显式指定，CI/容器常用 |
 

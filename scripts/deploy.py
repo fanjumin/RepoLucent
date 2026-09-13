@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""部署 verorun-dev-insight 到仓库 tools/dev_insight + 配置 git 忽略 + README 标注。
+"""部署 RepoLucent 到仓库 tools/dev_insight + 配置 git 忽略 + README 标注。
 
 仅执行写入/复制，不改动任何已有业务代码；只在 README 末尾追加"本地工具"说明段。
 """

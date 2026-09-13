@@ -2,7 +2,7 @@
 """用 tmp/ui_page.html 替换 server.py 的 _UI_PAGE 段（保留 handler 逻辑）。"""
 from pathlib import Path
 
-sp = Path(r"C:\Users\jumin\.openclaw-autoclaw\workspace\projects\verorun-dev-insight\vr_insight\server.py")
+sp = Path(r"C:\Users\jumin\.openclaw-autoclaw\workspace\projects\RepoLucent\vr_insight\server.py")
 ui = Path(r"C:\Users\jumin\.openclaw-autoclaw\workspace\.openclaw\tmp\ui_page.html").read_text(encoding="utf-8")
 
 text = sp.read_text(encoding="utf-8")

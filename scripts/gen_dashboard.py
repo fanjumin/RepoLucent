@@ -237,7 +237,7 @@ code{{background:#f2f3f5;padding:.05rem .35rem;border-radius:4px;font-family:Con
 <a class="on" href="#top">概览</a><a href="#core">系统核心</a><a href="#plugins">业务插件</a>
 <a href="#hot">变更热点</a><a href="#stat">代码量统计</a><a href="#arch">架构边界</a><a href="#fe">桌面端</a>
 </div>
-<div style="margin-top:1rem;font-size:.68rem;opacity:.5;padding:0 .5rem">verorun-dev-insight v{ver}<br>{esc(gen)}</div>
+<div style="margin-top:1rem;font-size:.68rem;opacity:.5;padding:0 .5rem">RepoLucent v{ver}<br>{esc(gen)}</div>
 </aside>
 <main class="main" id="top">
 <div class="head"><div><h1>VeroRun AI 系统架构仪表盘<span class="badge">v{ver}</span></h1>
@@ -281,7 +281,7 @@ code{{background:#f2f3f5;padding:.05rem .35rem;border-radius:4px;font-family:Con
 {fe_blocks if fe_blocks else '<div class="dim">未发现前端仓库</div>'}</section>
 </div>
 
-<div class="foot"><span>完整能力：控制台 http://127.0.0.1:8788 · 报告 verorun_insight_report.html · AI 上下文 AI_CONTEXT.md</span><span>verorun-dev-insight v{ver} · schema {d['meta']['schema_version']}</span></div>
+<div class="foot"><span>完整能力：控制台 http://127.0.0.1:8788 · 报告 verorun_insight_report.html · AI 上下文 AI_CONTEXT.md</span><span>RepoLucent v{ver} · schema {d['meta']['schema_version']}</span></div>
 </main></div></body></html>"""
 
 DST.write_text(html, encoding="utf-8")

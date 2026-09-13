@@ -431,7 +431,7 @@ TOOL_VERSION 与产物解耦，任意变更都可递增。
 ### Fixed
 - 旧名残留清理：`insight pull` 命令建议、`insight context` 用法提示、AI_CONTEXT 切片脚注、
   diff 报告标题、dashboard 品牌字样统一改为 RepoLens 体系
-  （保留项：`.insight_cache` 缓存目录名与 `VR_INSIGHT_*`/`~/.verorun-dev-insight` 兼容回落，
+  （保留项：`.insight_cache` 缓存目录名与 `VR_INSIGHT_*`/`~/.repolucent` 兼容回落，
   属 v2.0.0 更名六件套范畴）。
 
 ## [1.5.0] - 2026-09（回填）

@@ -3,7 +3,7 @@
 import re
 from pathlib import Path
 
-src = Path(r"C:\Users\jumin\.openclaw-autoclaw\workspace\projects\verorun-dev-insight\tests\gen_dashboard.py")
+src = Path(r"C:\Users\jumin\.openclaw-autoclaw\workspace\projects\RepoLucent\tests\gen_dashboard.py")
 text = src.read_text(encoding="utf-8")
 
 # 去掉头部：SRC/DST 常量与 d = json.loads(...)
@@ -23,6 +23,6 @@ fn = ('# -*- coding: utf-8 -*-\n'
       'from collections import Counter\n\n\n'
       'def render_dashboard(d: dict) -> str:\n'
       + indented + '\n    return html\n')
-out = Path(r"C:\Users\jumin\.openclaw-autoclaw\workspace\projects\verorun-dev-insight\vr_insight\dashboard_view.py")
+out = Path(r"C:\Users\jumin\.openclaw-autoclaw\workspace\projects\RepoLucent\vr_insight\dashboard_view.py")
 out.write_text(fn, encoding="utf-8")
 print("dashboard_view.py 已生成:", out.stat().st_size, "字节")

@@ -23,7 +23,7 @@ def _search_paths() -> list[Path]:
 
     1) 包内 settings.default.json   —— 随包发布，作为最低优先级兜底
     2) ~/.repolens/settings.json —— 用户级全局配置
-       （过渡期兼容：若不存在则回落读取旧目录 ~/.verorun-dev-insight/）
+       （过渡期兼容：若不存在则回落读取旧目录 ~/.repolucent/）
     3) <tool>/settings.json        —— 项目级配置
     4) 环境变量 REPO_LENS_SETTINGS 指向的文件 —— 显式指定（最高优先级；
        兼容旧名 VR_INSIGHT_SETTINGS）
@@ -34,7 +34,7 @@ def _search_paths() -> list[Path]:
     paths: list[Path] = []
     paths.append(_HERE / "settings.default.json")
     paths.append(Path.home() / ".repolens" / _DEFAULT_NAME)
-    _legacy_user = Path.home() / ".verorun-dev-insight" / _DEFAULT_NAME
+    _legacy_user = Path.home() / ".repolucent" / _DEFAULT_NAME
     if _legacy_user.is_file() and _legacy_user not in paths:
         paths.append(_legacy_user)
     paths.append(_TOOL_ROOT / _DEFAULT_NAME)

@@ -1,9 +1,9 @@
 {
   "meta": {
-    "tool": "verorun-dev-insight",
+    "tool": "RepoLucent",
     "tool_version": "1.2.0",
     "generated_at": "2026-09-09 10:55:36",
-    "repo_root": "C:\\Users\\jumin\\.openclaw-autoclaw\\workspace\\projects\\verorun-dev-insight\\tests\\fixture_repo",
+    "repo_root": "C:\\Users\\jumin\\.openclaw-autoclaw\\workspace\\projects\\RepoLucent\\tests\\fixture_repo",
     "tree_depth": 2,
     "tree": "fixture_repo/\n├── i18n/  (1 .py)  ← 核心\n│   └── __init__.py\n├── plugin_manager/  (3 .py)  ← 核心\n│   ├── base.py\n│   ├── discovery.py\n│   └── manager.py\n├── plugins/  (5 .py)  ← 插件\n│   ├── _base/  (1 .py)\n│   ├── bad/  (1 .py)  ← 插件\n│   ├── demo/  (2 .py)  ← 插件\n│   └── __init__.py\n├── shared/  (1 .py)  ← 核心\n│   └── __init__.py\n├── AGENTS.md\n├── debug_probe.py\n└── test_results.json",
     "duration_ms": 55
