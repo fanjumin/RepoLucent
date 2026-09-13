@@ -17,7 +17,9 @@ SUITES = ["verify_security", "verify_agents", "verify_symbols", "verify_schema",
           # v1.8.0 阶段三 3-C 新增：多 kind 适配器（EXT-2/3/5）/ LLM 流式与用量（LLM-5）
           "verify_adapters", "verify_llm_stream",
           # v2.0.0 阶段 F 新增：规则引擎（SPEC/SEC/ARCH/CMP）
-          "verify_rules"]
+          "verify_rules",
+          # v2.x 新增：路径点选（fs_browse）/ 项目分组与子范围统计（projects）
+          "verify_fs_browse", "verify_projects"]
 
 py = sys.executable
 fails = []

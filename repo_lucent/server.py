@@ -990,6 +990,204 @@ def _api_repos_switch(h, q, body):
                 "hint": "已切换；控制台刷新 dashboard 触发新一轮分析"})
 
 
+# ------------------------------------------------- 端点：路径点选 + 项目分组 ----
+
+@route("GET", "/api/fs/list")
+def _api_fs_list(h, q, body):
+    """目录浏览（只读）：路径点选的服务端基础。path 为空 → 起点（盘符+用户目录）。"""
+    from .fs_browse import list_dir
+    raw = (q.get("path") or [None])[0]
+    try:
+        return _ok(list_dir(raw))
+    except ValueError as e:
+        return _err(400, "BadRequest", str(e))
+
+
+@route("GET", "/api/projects")
+def _api_projects(h, q, body):
+    """项目列表（含内嵌成员）。"""
+    from . import project_registry as PR
+    return _ok({"projects": PR.list_projects(),
+                "path": str(PR.projects_path())})
+
+
+@route("POST", "/api/projects/add")
+def _api_projects_add(h, q, body):
+    from . import project_registry as PR
+    name = str(body.get("name") or "")
+    if not name:
+        return _err(400, "BadRequest", "缺少 name 参数")
+    if not bool(body.get("confirm", False)):
+        return _ok({"ok": True, "dry_run": True, "action": "projects.add",
+                    "name": name, "hint": "传 confirm=true 才写入注册表"})
+    try:
+        ent = PR.add_project(name)
+    except ValueError as e:
+        return _err(400, "BadRequest", str(e))
+    return _ok({"ok": True, "project": ent})
+
+
+@route("POST", "/api/projects/remove")
+def _api_projects_remove(h, q, body):
+    from . import project_registry as PR
+    name = str(body.get("name") or "")
+    if not name:
+        return _err(400, "BadRequest", "缺少 name 参数")
+    if not bool(body.get("confirm", False)):
+        return _ok({"ok": True, "dry_run": True, "action": "projects.remove",
+                    "name": name, "hint": "传 confirm=true 才移除（不影响磁盘与分析产物）"})
+    ok = PR.remove_project(name)
+    if not ok:
+        return _err(404, "NotFound", f"项目中无此项目：{name}")
+    return _ok({"ok": True, "name": name})
+
+
+@route("POST", "/api/projects/repos/add")
+def _api_projects_repos_add(h, q, body):
+    from . import project_registry as PR
+    proj = str(body.get("project") or "")
+    name = str(body.get("name") or "")
+    path = str(body.get("path") or "")
+    if not proj or not name or not path:
+        return _err(400, "BadRequest", "缺少 project / name / path 参数")
+    profile = body.get("profile") or None
+    scopes = body.get("scopes") or []
+    if not bool(body.get("confirm", False)):
+        return _ok({"ok": True, "dry_run": True, "action": "projects.repos.add",
+                    "project": proj, "name": name, "path": path,
+                    "profile": profile, "scopes": scopes,
+                    "hint": "传 confirm=true 才写入（scopes 会先校验是真实子目录）"})
+    try:
+        ent = PR.add_member(proj, name, path, profile, scopes)
+    except ValueError as e:
+        return _err(400, "BadRequest", str(e))
+    return _ok({"ok": True, "member": ent})
+
+
+@route("POST", "/api/projects/repos/remove")
+def _api_projects_repos_remove(h, q, body):
+    from . import project_registry as PR
+    proj = str(body.get("project") or "")
+    name = str(body.get("name") or "")
+    if not proj or not name:
+        return _err(400, "BadRequest", "缺少 project / name 参数")
+    if not bool(body.get("confirm", False)):
+        return _ok({"ok": True, "dry_run": True, "action": "projects.repos.remove",
+                    "project": proj, "name": name,
+                    "hint": "传 confirm=true 才移除（不影响磁盘与分析产物）"})
+    ok = PR.remove_member(proj, name)
+    if not ok:
+        return _err(404, "NotFound", f"项目中无此成员：{name}")
+    return _ok({"ok": True, "project": proj, "name": name})
+
+
+def _project_artifact_summary(base: Path) -> dict | None:
+    """读取某成员/子范围的最新产物摘要；缺失或损坏返回 None（状态=未分析）。"""
+    from .config import latest_artifact_dir
+    from .cli import _summary_pairs
+    d = latest_artifact_dir(base)
+    if d is None:
+        return None
+    f = d / "repo_lucent.json"
+    if not f.is_file():
+        return None
+    try:
+        data = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict) or not data.get("overview"):
+        return None
+    dur = ((data.get("meta") or {}).get("duration_ms")) or 0
+    return dict(_summary_pairs(data, dur))
+
+
+@route("GET", "/api/projects/summary")
+def _api_projects_summary(h, q, body):
+    """项目聚合摘要（只读）：读已有产物，缺失标 not_analyzed，绝不触发分析。"""
+    from . import project_registry as PR
+    name = (q.get("name") or [""])[0]
+    proj = PR.resolve_project(name)
+    if proj is None:
+        return _err(404, "NotFound", f"项目中无此项目：{name}")
+    cfg = h.state["cfg"]
+    out_root = ((cfg.stable_out_dir or cfg.out_dir).parent
+                / "projects" / proj["name"])
+    members = []
+    for m in proj.get("repos") or []:
+        mb = out_root / m["name"]
+        s = _project_artifact_summary(mb)
+        row = {"name": m["name"], "path": m["path"], "profile": m.get("profile"),
+               "status": "analyzed" if s else "not_analyzed",
+               "summary": s, "out_base": str(mb), "scopes": []}
+        for sc in m.get("scopes") or []:
+            ss = _project_artifact_summary(mb / sc)
+            row["scopes"].append({"name": sc,
+                                  "status": "analyzed" if ss else "not_analyzed",
+                                  "summary": ss, "out_base": str(mb / sc)})
+        members.append(row)
+    return _ok({"project": proj["name"], "members": members})
+
+
+@route("POST", "/api/projects/analyze")
+def _api_projects_analyze(h, q, body):
+    """分析项目的一个成员（或其子范围）：完整复用既有管线，产物落到项目命名空间。
+
+    不触碰 h.state（当前 dashboard 指向的仓库不受影响）；按成员 profile 临时
+    覆盖全局 settings（与 /api/repos/switch 同款），finally 恢复。子范围强制
+    内置口径（目录视角，无插件识别），UI 侧应标注「目录口径」。
+    """
+    from types import SimpleNamespace
+    from . import project_registry as PR
+    from . import config as C
+    from . import settings as S
+    from .cli import _analyze, _write_reports, _summary_pairs
+    pname = str(body.get("project") or "")
+    mname = str(body.get("member") or "")
+    proj = PR.resolve_project(pname)
+    if proj is None:
+        return _err(404, "NotFound", f"项目中无此项目：{pname}")
+    m = PR.resolve_member(proj, mname)
+    if m is None:
+        return _err(404, "NotFound", f"项目中无此成员：{mname}")
+    scope = str(body.get("scope") or "").strip() or None
+    if scope:
+        if scope not in (m.get("scopes") or []):
+            return _err(400, "BadRequest",
+                        f"成员未登记该子范围：{scope}（已登记 {m.get('scopes') or []}）")
+        root = Path(m["path"]) / scope
+        eff_profile = None            # 子范围：内置口径（目录视角）
+        label = f"{mname}/{scope}"
+    else:
+        root = Path(m["path"])
+        eff_profile = m.get("profile") or None
+        label = mname
+    if not root.is_dir():
+        return _err(400, "BadRequest", f"分析目标不存在：{root}")
+    only = str(body.get("only") or "json,md")
+    cfg = h.state["cfg"]
+    base = ((cfg.stable_out_dir or cfg.out_dir).parent / "projects"
+            / proj["name"] / m["name"] / (scope or ""))
+    prev_override = getattr(S, "_PROFILE_OVERRIDE", None)
+    try:
+        effective = S.set_profile_override(eff_profile)
+        C.apply_profile()
+        new_cfg = C.RepoConfig(repo_root=root, out_dir=base)
+        tc = C.ToolConfig.from_settings()
+        new_cfg.max_tree_depth = tc.max_tree_depth
+        new_cfg.max_plugins_in_ai_context = tc.max_plugins_in_ai_context
+        new_cfg = C.apply_date_dir(new_cfg, base)
+        ns = SimpleNamespace(no_cache=False, deterministic=False)
+        data, dur, parse_cache = _analyze(ns, new_cfg)
+        written = _write_reports(new_cfg, data, only=only, parse_cache=parse_cache)
+        summary = dict(_summary_pairs(data, dur))
+    finally:
+        S.set_profile_override(prev_override)
+        C.apply_profile()
+    return _ok({"ok": True, "target": label, "profile": effective,
+                "out_dir": str(new_cfg.out_dir),
+                "written": [str(p) for p in written], "summary": summary})
+
+
 @route("POST", "/api/settings/llm")
 def _api_settings_llm(h, q, body):
     # LLM 可视化配置写回（OPEN-D+）：只写 key_env 变量名，密钥本体永不落盘
