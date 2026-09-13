@@ -37,8 +37,8 @@ os.environ.setdefault("PYTHONUNBUFFERED", "1")
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
-from repo_lens import hotspot_analyzer as H                     # noqa: E402
-from repo_lens.config import RepoConfig                         # noqa: E402
+from repo_lucent import hotspot_analyzer as H                     # noqa: E402
+from repo_lucent.config import RepoConfig                         # noqa: E402
 
 RESULTS: list[dict] = []
 

@@ -11,7 +11,7 @@
   7) 检索截断：limit 生效且置 truncated=true（count 仍为真实命中数）
   8) 未命中：count=0、hits=[]、match 保持 exact
   9) 确定性：同一 parse_cache 两次构建逐字节一致
- 10) 产物往返：_write_reports 落 repo_lens_symbols.json，且主 JSON 的 symbols
+ 10) 产物往返：_write_reports 落 repo_lucent_symbols.json，且主 JSON 的 symbols
      摘要段 count/index_file 与索引文件一致
  11) 索引缺失时降级：build_search 返回空结果 + note，不抛异常
  12) CLI e2e：search 命中 rc=0 / 未命中 rc=1；JSON 载荷字段齐全
@@ -33,9 +33,9 @@ os.environ.setdefault("PYTHONUNBUFFERED", "1")
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
-from repo_lens import cli                                   # noqa: E402
-from repo_lens.config import RepoConfig                     # noqa: E402
-from repo_lens.symbol_index import (build_symbol_index, search_symbols,  # noqa: E402
+from repo_lucent import cli                                   # noqa: E402
+from repo_lucent.config import RepoConfig                     # noqa: E402
+from repo_lucent.symbol_index import (build_symbol_index, search_symbols,  # noqa: E402
                                     index_from_file)
 
 RESULTS: list[dict] = []
@@ -107,8 +107,8 @@ def _analyze(repo: Path, out: Path):
 
 def _cli(repo: Path, out: Path, extra: list[str]):
     env = dict(os.environ, PYTHONPATH=str(HERE))
-    env.pop("REPO_LENS_SETTINGS", None)
-    cmd = [sys.executable, "-m", "repo_lens", "--repo", str(repo),
+    env.pop("REPO_LUCENT_SETTINGS", None)
+    cmd = [sys.executable, "-m", "repo_lucent", "--repo", str(repo),
            "--out", str(out), "--no-date-dir", "--quiet"] + extra
     r = subprocess.run(cmd, capture_output=True, text=True, env=env,
                        cwd=str(HERE), timeout=600)
@@ -194,12 +194,12 @@ def main() -> int:
 
     # ---- 10) 产物往返（独立索引文件 + 主 JSON 摘要段一致）----
     cli._write_reports(cfg, data, "json,symbols", parse_cache=pc)
-    idx_path = cfg.out_dir / "repo_lens_symbols.json"
-    d = json.loads((cfg.out_dir / "repo_lens.json").read_text(encoding="utf-8"))
+    idx_path = cfg.out_dir / "repo_lucent_symbols.json"
+    d = json.loads((cfg.out_dir / "repo_lucent.json").read_text(encoding="utf-8"))
     disk = index_from_file(idx_path) if idx_path.is_file() else {}
     summ = d.get("symbols") or {}
     check("symbols_artifact_and_summary_in_sync",
-          idx_path.is_file() and summ.get("index_file") == "repo_lens_symbols.json"
+          idx_path.is_file() and summ.get("index_file") == "repo_lucent_symbols.json"
           and summ.get("count") == index["count"] == disk.get("count"),
           f"file={idx_path.name} summary_count={summ.get('count')} "
           f"disk_count={disk.get('count')}")

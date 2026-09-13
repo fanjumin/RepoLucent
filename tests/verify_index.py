@@ -38,8 +38,8 @@ os.environ.setdefault("PYTHONUNBUFFERED", "1")
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
-from repo_lens import cli, index_db                             # noqa: E402
-from repo_lens.config import RepoConfig                         # noqa: E402
+from repo_lucent import cli, index_db                             # noqa: E402
+from repo_lucent.config import RepoConfig                         # noqa: E402
 
 RESULTS: list[dict] = []
 
@@ -80,7 +80,7 @@ def _analyze(cfg) -> tuple[dict, dict]:
 
 def _cli(args: list[str], cwd: Path | None = None):
     env = dict(os.environ, PYTHONPATH=str(HERE))
-    r = subprocess.run([sys.executable, "-m", "repo_lens"] + args,
+    r = subprocess.run([sys.executable, "-m", "repo_lucent"] + args,
                        capture_output=True, text=True, encoding="utf-8",
                        errors="replace", env=env, cwd=str(cwd or HERE))
     return r.returncode, (r.stdout or "") + (r.stderr or "")

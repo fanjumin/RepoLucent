@@ -4,16 +4,16 @@
 故障根因两条：
   A) 旧版本进程占用端口后，新进程因 SO_REUSEADDR（Windows 允许重复绑定）静默"启动成功"，
      请求仍被旧进程受理；旧进程的 UI_STATIC_DIR 指向已改名的 vr_insight/ui/static → 静态资源 404。
-  B) start_repolens.bat 把 PYEXE（值可为 "py -3"，含空格）加了引号 → cmd 找不到程序。
+  B) start_repolucent.bat 把 PYEXE（值可为 "py -3"，含空格）加了引号 → cmd 找不到程序。
 
 本脚本断言：
   1) _ConsoleServer.allow_reuse_address is False（防回退到"静默重复绑定"）
   2) _port_in_use：占用端口 True / 空闲端口 False
   3) start() 在端口被占用时 SystemExit(2)（不再是静默启动）
-  4) 真实 HTTP：/ 200 且含 RepoLens 品牌与 REPOLENS 版本栏（不是旧 DEV INSIGHT）
+  4) 真实 HTTP：/ 200 且含 RepoLucent 品牌与 REPOLUCENT 版本栏（不是旧 DEV INSIGHT）
   5) 真实 HTTP：/static/{app.js,tokens.css,icons.js} 全部 200 且非空 ← 故障核心断言
   6) 静态资源目录穿越仍被拦截（回归）
-  7) start_repolens.bat：%PYEXE% 未被引号包裹、无 where py 的旧写法
+  7) start_repolucent.bat：%PYEXE% 未被引号包裹、无 where py 的旧写法
 
 输出纯 ASCII JSON 到 out/ui_startup_verify.json。
 """
@@ -31,7 +31,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from repo_lens import cli, server as S  # noqa: E402
+from repo_lucent import cli, server as S  # noqa: E402
 
 HERE = Path(__file__).resolve().parent.parent
 PORT_HTTP = 8811
@@ -114,11 +114,11 @@ def main() -> int:
 
         st, body = get("/")
         html = body.decode("utf-8", "replace")
-        ok4 = (st == 200 and "RepoLens" in html and "REPOLENS" in html
+        ok4 = (st == 200 and "RepoLucent" in html and "REPOLUCENT" in html
                and "DEV INSIGHT" not in html)
         record("index_page_brand", ok4,
-               f"status={st} RepoLens={'RepoLens' in html} "
-               f"REPOLENS={'REPOLENS' in html} old={'DEV INSIGHT' in html}")
+               f"status={st} RepoLucent={'RepoLucent' in html} "
+               f"REPOLUCENT={'REPOLUCENT' in html} old={'DEV INSIGHT' in html}")
 
         sizes = {}
         for f in ("app.js", "tokens.css", "icons.js"):
@@ -130,7 +130,7 @@ def main() -> int:
         # 目录穿越仍被拦截（原始 + URL 编码）
         blocked = []
         for p in ("/static/../server.py", "/static/%2e%2e%2fserver.py",
-                  "/static/..%2f..%2frepolens.py"):
+                  "/static/..%2f..%2frepolucent.py"):
             try:
                 with urllib.request.urlopen(f"http://127.0.0.1:{PORT_HTTP}{p}",
                                             timeout=10) as r:
@@ -143,7 +143,7 @@ def main() -> int:
         srv.shutdown()
 
     # ---- 7) bat 启动器引号修复 ----
-    bat = (HERE / "start_repolens.bat").read_text(encoding="utf-8", errors="replace")
+    bat = (HERE / "start_repolucent.bat").read_text(encoding="utf-8", errors="replace")
     ok7 = ('"%PYEXE%"' not in bat) and ("%PYEXE%" in bat) and ("where py" not in bat)
     record("bat_pyexe_unquoted", ok7,
            f"quoted={'\"%PYEXE%\"' in bat} unquoted={'%PYEXE%' in bat} "

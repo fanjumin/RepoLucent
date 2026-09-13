@@ -24,12 +24,12 @@ from types import SimpleNamespace
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
-from repo_lens import config
-from repo_lens.cli import _setup
-from repo_lens.gate import default_gates, expand
-from repo_lens.frontend_analyzer import discover_frontend_repos
-from repo_lens.plugin_analyzer import analyze_plugins
-from repo_lens.core_analyzer import analyze_core
+from repo_lucent import config
+from repo_lucent.cli import _setup
+from repo_lucent.gate import default_gates, expand
+from repo_lucent.frontend_analyzer import discover_frontend_repos
+from repo_lucent.plugin_analyzer import analyze_plugins
+from repo_lucent.core_analyzer import analyze_core
 
 RESULTS = []
 
@@ -42,7 +42,7 @@ def write_settings(profile: dict | None) -> Path:
     p = HERE / "out" / "_verify_profile_settings.json"
     p.write_text(json.dumps({"profile": profile} if profile is not None else {},
                             ensure_ascii=False), encoding="utf-8")
-    os.environ["REPO_LENS_SETTINGS"] = str(p)
+    os.environ["REPO_LUCENT_SETTINGS"] = str(p)
     return p
 
 def make_verorun_fixture(root: Path) -> Path:
@@ -71,7 +71,7 @@ if work.exists():
     shutil.rmtree(work)
 work.mkdir(parents=True, exist_ok=True)
 repo = make_verorun_fixture(work / "fake_verorun")
-os.environ.pop("REPO_LENS_SETTINGS", None)
+os.environ.pop("REPO_LUCENT_SETTINGS", None)
 
 # ================================================================ 用例 1 ====
 # 无 settings 注入：口径 = 内置 VeroRun 基线
@@ -93,9 +93,9 @@ record("no_settings_matches_baseline", ok1,
 # 仓库签名可换：--repo 指向本工具自身（无 plugins/+plugin_manager/）不再 SystemExit
 write_settings({
     "name": "tool-self",
-    "repo_signature": {"dirs": [], "files": ["repolens.py"]},
+    "repo_signature": {"dirs": [], "files": ["repolucent.py"]},
 })
-tool_self_cfg = make_cfg(HERE)          # 工具根含 repolens.py，无 plugins/ 目录
+tool_self_cfg = make_cfg(HERE)          # 工具根含 repolucent.py，无 plugins/ 目录
 ok2 = tool_self_cfg.repo_root == HERE.resolve()
 record("repo_signature_accepts_non_verorun", ok2,
        f"repo_root={tool_self_cfg.repo_root} (期望 {HERE.resolve()})")
@@ -187,10 +187,10 @@ record("frontend_repo_names_configurable", ok7a and ok7b,
 
 # ---------------------------------------------------------------- 汇总 ----
 fails = [r for r in RESULTS if not r["ok"]]
-os.environ.pop("REPO_LENS_SETTINGS", None)                 # 还原环境
+os.environ.pop("REPO_LUCENT_SETTINGS", None)                 # 还原环境
 # 复位到内置基线（防同进程后续使用污染）
 write_settings(None)
-os.environ.pop("REPO_LENS_SETTINGS", None)
+os.environ.pop("REPO_LUCENT_SETTINGS", None)
 shutil.rmtree(work, ignore_errors=True)
 try:
     (HERE / "out" / "_verify_profile_settings.json").unlink()

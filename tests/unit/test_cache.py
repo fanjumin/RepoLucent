@@ -12,9 +12,9 @@ import json
 import os
 from pathlib import Path
 
-from repo_lens.cache import (CACHE_VERSION, HASH_LEN, cache_key, hash_file,
+from repo_lucent.cache import (CACHE_VERSION, HASH_LEN, cache_key, hash_file,
                              load, load_hashes, resolve, save, signature)
-from repo_lens.fs_scan import MAX_TEXT_BYTES
+from repo_lucent.fs_scan import MAX_TEXT_BYTES
 
 
 def _mk(tmp_path: Path, name: str, content: bytes) -> Path:

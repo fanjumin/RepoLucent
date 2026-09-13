@@ -2,7 +2,7 @@
 """MCP 服务化 e2e 自验证（需求3 验收，§2.3 范式）。
 
 复用本工具自带的 subprocess_harness.JsonRpcProc 当 e2e 客户端，对真实启动的
-`repolens.py mcp` 进程跑：initialize / tools/list / tools/call(repo.summary) / 未知方法
+`repolucent.py mcp` 进程跑：initialize / tools/list / tools/call(repo.summary) / 未知方法
 四用例，并额外验证安全红线未被放宽：
   - archived 脚本（copy_patchset）经 tools/call 须返回 not_runnable_via_api（不放宽白名单）
   - active 脚本（anchor_assert）confirm=false 须仅 dry-run，不真执行
@@ -23,12 +23,12 @@ os.environ.setdefault("PYTHONUNBUFFERED", "1")
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
-from repo_lens.scriptlib.subprocess_harness import (  # noqa: E402
+from repo_lucent.scriptlib.subprocess_harness import (  # noqa: E402
     JsonRpcProc, has_result, has_error, expect_field,
 )
 
 REPO_DEFAULT = HERE / "tests" / "fixture_repo"
-INSIGHT = HERE / "repolens.py"
+INSIGHT = HERE / "repolucent.py"
 
 def _content_text(resp: dict) -> str:
     try:
@@ -48,9 +48,9 @@ def main() -> int:
     out = Path(tempfile.mkdtemp(prefix="mcp_verify_"))
     print(f"[verify] repo={repo}\n[verify] out ={out}")
 
-    # 经模块入口调用（python -m repo_lens），零文件路径硬编码；
+    # 经模块入口调用（python -m repo_lucent），零文件路径硬编码；
     # 包位置由 PYTHONPATH 注入（HERE 由 __file__ 推导，非写死）。
-    proc = JsonRpcProc([sys.executable, "-m", "repo_lens", "mcp",
+    proc = JsonRpcProc([sys.executable, "-m", "repo_lucent", "mcp",
                         "--repo", str(repo), "--out", str(out)],
                        env=dict(os.environ, PYTHONPATH=str(HERE)))
     results: list[dict] = []

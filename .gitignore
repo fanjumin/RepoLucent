@@ -16,7 +16,7 @@ _openclaw-baseline-regress.log
 _archive_cleanup_*/
 
 # ===== Local machine-specific config =====
-repolens.ini
+repolucent.ini
 settings.json
 settings.json.bak
 *.bak

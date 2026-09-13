@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """v1.8.0 阶段三 3-A 验收：pack 分层（写能力从只读内核剥离）。
 
-分层目标：内核（``repo_lens/*.py`` + ``registry.core.json``）只保留通用只读分析；
+分层目标：内核（``repo_lucent/*.py`` + ``registry.core.json``）只保留通用只读分析；
 git 工作流（push/pull/sync/group/batch）与业务探针（store_probe/ssh_readonly_probe）
-收敛到 ``repo_lens/packs/<name>/``。本套件验证结构与门控，核心断言是
+收敛到 ``repo_lucent/packs/<name>/``。本套件验证结构与门控，核心断言是
 「默认配置下既有行为零变化」。
 
 覆盖矩阵：
@@ -39,8 +39,8 @@ os.environ.setdefault("PYTHONUNBUFFERED", "1")
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
-from repo_lens import packs                                   # noqa: E402
-from repo_lens.script_cmd import (_ALLOWED_PKGS, _load_core_registry,   # noqa: E402
+from repo_lucent import packs                                   # noqa: E402
+from repo_lucent.script_cmd import (_ALLOWED_PKGS, _load_core_registry,   # noqa: E402
                                   _load_registry)
 
 RESULTS: list[dict] = []
@@ -52,15 +52,15 @@ def check(name, ok, detail=""):
 def _cli(args: list[str], settings_raw: str | None = None):
     """跑一次 CLI，返回 (rc, combined_output)。settings_raw 非 None 时注入临时配置。"""
     env = dict(os.environ, PYTHONPATH=str(HERE))
-    env.pop("REPO_LENS_SETTINGS", None)
+    env.pop("REPO_LUCENT_SETTINGS", None)
     tmp = None
     if settings_raw is not None:
         fd, tmp = tempfile.mkstemp(prefix="packs_settings_", suffix=".json")
         os.close(fd)
         Path(tmp).write_text(settings_raw, encoding="utf-8")
-        env["REPO_LENS_SETTINGS"] = tmp
+        env["REPO_LUCENT_SETTINGS"] = tmp
     try:
-        r = subprocess.run([sys.executable, "-m", "repo_lens"] + args,
+        r = subprocess.run([sys.executable, "-m", "repo_lucent"] + args,
                            capture_output=True, text=True, encoding="utf-8",
                            errors="replace", env=env, cwd=str(HERE))
         return r.returncode, (r.stdout or "") + (r.stderr or "")
@@ -72,25 +72,25 @@ def _cli(args: list[str], settings_raw: str | None = None):
                 pass
 
 def _with_settings(raw: str):
-    """上下文管理器：临时把 REPO_LENS_SETTINGS 指向给定内容（进程内即时生效）。
+    """上下文管理器：临时把 REPO_LUCENT_SETTINGS 指向给定内容（进程内即时生效）。
 
     可行是因为 settings.load_settings() 每次调用都重读搜索链，故环境变量变更
     立刻反映到 packs.enabled_packs()。
     """
     @contextlib.contextmanager
     def _cm():
-        old = os.environ.get("REPO_LENS_SETTINGS")
+        old = os.environ.get("REPO_LUCENT_SETTINGS")
         fd, tmp = tempfile.mkstemp(prefix="packs_s_", suffix=".json")
         os.close(fd)
         Path(tmp).write_text(raw, encoding="utf-8")
-        os.environ["REPO_LENS_SETTINGS"] = tmp
+        os.environ["REPO_LUCENT_SETTINGS"] = tmp
         try:
             yield
         finally:
             if old is None:
-                os.environ.pop("REPO_LENS_SETTINGS", None)
+                os.environ.pop("REPO_LUCENT_SETTINGS", None)
             else:
-                os.environ["REPO_LENS_SETTINGS"] = old
+                os.environ["REPO_LUCENT_SETTINGS"] = old
             try:
                 os.unlink(tmp)
             except OSError:
@@ -111,7 +111,7 @@ def main() -> int:
     # ---- 1) 可用 pack 与登记一致 ----------------------------------------------
     avail = packs.available_packs()
     check("available_packs_registered_and_present",
-          avail == [n for n in packs.PACKS if (HERE / "repo_lens" / "packs" / n).is_dir()],
+          avail == [n for n in packs.PACKS if (HERE / "repo_lucent" / "packs" / n).is_dir()],
           f"available={avail}")
 
     # ---- 2) 内置 profile 默认启用集 -------------------------------------------
@@ -158,7 +158,7 @@ def main() -> int:
           f"core_n={len(core_ids)}")
 
     # ---- 8) gitflow commands 声明与 registry.json 一致 ------------------------
-    gj = json.loads((HERE / "repo_lens" / "packs" / "gitflow" / "registry.json")
+    gj = json.loads((HERE / "repo_lucent" / "packs" / "gitflow" / "registry.json")
                     .read_text(encoding="utf-8"))
     file_cmds = [c["name"] for c in gj.get("commands", [])]
     check("gitflow_commands_single_source_of_truth",
@@ -166,7 +166,7 @@ def main() -> int:
           f"file={file_cmds} code={list(packs.PACKS['gitflow']['commands'])}")
 
     # ---- 9) 内核目录不含已迁移模块 --------------------------------------------
-    left = [m for m in MOVED_MODULES if (HERE / "repo_lens" / m).exists()]
+    left = [m for m in MOVED_MODULES if (HERE / "repo_lucent" / m).exists()]
     check("no_migrated_modules_left_in_kernel", not left, f"left={left}")
 
     # ---- 10) CLI 默认：pack 命令可用 ------------------------------------------
@@ -207,19 +207,19 @@ def main() -> int:
 
     # ---- 14) 安全边界前缀 -----------------------------------------------------
     check("allowed_prefixes_cover_kernel_and_packs",
-          _ALLOWED_PKGS == ("repo_lens.scriptlib.", "repo_lens.packs."),
+          _ALLOWED_PKGS == ("repo_lucent.scriptlib.", "repo_lucent.packs."),
           f"{_ALLOWED_PKGS}")
 
-    from repo_lens.scriptlib.adapters.base import (ALLOWED_ENTRY_PREFIXES,
+    from repo_lucent.scriptlib.adapters.base import (ALLOWED_ENTRY_PREFIXES,
                                                    entry_allowed)
     check("allowed_prefixes_single_source_in_sync",
           _ALLOWED_PKGS == ALLOWED_ENTRY_PREFIXES,
           f"script_cmd={_ALLOWED_PKGS} adapters_base={ALLOWED_ENTRY_PREFIXES}")
     check("entry_allowed_rejects_foreign_module",
-          entry_allowed("repo_lens.scriptlib.sloc_summary")
-          and entry_allowed("repo_lens.packs.verorun.store_probe")
+          entry_allowed("repo_lucent.scriptlib.sloc_summary")
+          and entry_allowed("repo_lucent.packs.verorun.store_probe")
           and not entry_allowed("os.system")
-          and not entry_allowed("repo_lens.evil")
+          and not entry_allowed("repo_lucent.evil")
           and not entry_allowed("")
           and not entry_allowed(None), "")
 

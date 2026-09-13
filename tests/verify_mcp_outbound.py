@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """outbound MCP 自验证（审计 EXT-4 / 总计划 P2-1）：本工具作为**客户端**消费外部 MCP Server。
 
-被测外部 Server 用本工具自身的 `python -m repo_lens mcp` 充当（真实子进程、真实
+被测外部 Server 用本工具自身的 `python -m repo_lucent mcp` 充当（真实子进程、真实
 JSON-RPC 往返），因此不是 mock，而是端到端可复现。
 
 用例：
@@ -30,7 +30,7 @@ os.environ.setdefault("PYTHONUNBUFFERED", "1")
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
-from repo_lens import cli  # noqa: E402
+from repo_lucent import cli  # noqa: E402
 
 REPO = HERE / "tests" / "fixture_repo"
 
@@ -66,7 +66,7 @@ def main() -> int:
     results: list[dict] = []
     out = Path(tempfile.mkdtemp(prefix="mcp_out_"))
     cfg = cli._setup(_make_args(REPO, out))
-    from repo_lens.mcp import catalog
+    from repo_lucent.mcp import catalog
 
     tmp = Path(tempfile.mkdtemp(prefix="mcp_out_cfg_"))
 
@@ -74,14 +74,14 @@ def main() -> int:
     # + registry 中 active 且 kind=tool 的脚本数。
     # 两者都是"活的资产"，故不硬编码条数，避免能力演进（如 v1.6.0 新增
     # repo.context / repo.search）导致本套件误报。
-    from repo_lens.script_cmd import _load_registry
+    from repo_lucent.script_cmd import _load_registry
     _reg = _load_registry()
     N_ACTIVE = sum(1 for s in _reg.get("scripts", [])
                    if s.get("status") == "active" and s.get("kind") == "tool")
     BASE_N = len(catalog.CORE_TOOLS) + N_ACTIVE
 
     # ---------- 用例 1：无 server → 清单不变 ----------
-    os.environ["REPO_LENS_SETTINGS"] = _write_settings(
+    os.environ["REPO_LUCENT_SETTINGS"] = _write_settings(
         {"mcp_outbound_enabled": True, "mcp_servers": []})
     tools0 = catalog.list_tools(cfg)
     ok1 = (len(tools0) == BASE_N) and not any(t["name"].startswith("mcp.") for t in tools0)
@@ -90,17 +90,17 @@ def main() -> int:
                                "has_ext": any(t["name"].startswith("mcp.") for t in tools0)}})
 
     # ---------- 用例 2/3：配置 stdio server ----------
-    os.environ["REPO_LENS_SETTINGS"] = _write_settings({
+    os.environ["REPO_LUCENT_SETTINGS"] = _write_settings({
         "mcp_outbound_enabled": True,
         "mcp_servers": [{
             "name": "demo", "transport": "stdio",
             "command": sys.executable,
-            "args": ["-m", "repo_lens", "mcp", "--repo", str(REPO), "--out", str(out)],
+            "args": ["-m", "repo_lucent", "mcp", "--repo", str(REPO), "--out", str(out)],
             "env": {"PYTHONPATH": str(HERE)},
             "timeout_s": 60,
         }],
     })
-    from repo_lens.scriptlib.adapters import mcp as mcpad
+    from repo_lucent.scriptlib.adapters import mcp as mcpad
     mcpad.release_all()
     tools, errors = mcpad.discover_tools()
     names = [t["name"] for t in tools]
@@ -145,9 +145,9 @@ def main() -> int:
                     "detail": {"isError": r6.get("isError"), "text": txt6[:160]}})
 
     # ---------- 用例 7：HTTP 传输 ----------
-    from repo_lens.server import _Handler, ThreadingHTTPServer
+    from repo_lucent.server import _Handler, ThreadingHTTPServer
     mcpad.release_all()
-    os.environ["REPO_LENS_SETTINGS"] = _write_settings({
+    os.environ["REPO_LUCENT_SETTINGS"] = _write_settings({
         "mcp_outbound_enabled": True,
         "mcp_servers": [{"name": "demo_http", "transport": "http",
                          "url": "http://127.0.0.1:8801/mcp", "timeout_s": 60}],
@@ -189,13 +189,13 @@ def main() -> int:
     mcpad.release_all()
 
     # ---------- 用例 8：kind 适配器分派 ----------
-    from repo_lens.scriptlib.adapters import dispatch
+    from repo_lucent.scriptlib.adapters import dispatch
     import importlib
     fake_mod = types.SimpleNamespace(main=lambda argv: 0)
     orig_import = importlib.import_module
     try:
         importlib.import_module = lambda name: fake_mod  # noqa: E731 - 桩掉导入，避免真执行脚本
-        rb = dispatch({"kind": "builtin", "entry": "repo_lens.scriptlib.fake"}, [])
+        rb = dispatch({"kind": "builtin", "entry": "repo_lucent.scriptlib.fake"}, [])
     finally:
         importlib.import_module = orig_import
     ru = dispatch({"kind": "quantum"}, [])
@@ -211,7 +211,7 @@ def main() -> int:
                                "outside_pkg_rejected": (rx.hint or "")[:60] or None,
                                "mcp_missing_spec_code": rm.exit_code}})
 
-    os.environ.pop("REPO_LENS_SETTINGS", None)
+    os.environ.pop("REPO_LUCENT_SETTINGS", None)
     mcpad.release_all()
 
     fails = [r for r in results if not r["ok"]]

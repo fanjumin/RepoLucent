@@ -1,6 +1,6 @@
-# 仓库开发上下文（RepoLens 自动生成）
+# 仓库开发上下文（RepoLucent 自动生成）
 
-> 生成：RepoLens v2.0.0 · None · 仓库 `fixture_repo`
+> 生成：RepoLucent v2.0.0 · None · 仓库 `fixture_repo`
 > 用途：把本文件作为 AI 助手的上下文，代替通读仓库源码。开发前只需提供本文件。
 
 ## 1. 系统架构（系统核心 = 平台引擎；业务插件 = 可插拔能力）
@@ -61,4 +61,4 @@ identifier, name, version, description, author, min_app_version, agent_role, cap
 - 操作前先方案后执行；对比/分析类指令只输出报告。
 
 ---
-*本地工具生成物，不进入 Git。完整信息见 repo_lens_report.md / repo_lens.json。*
+*本地工具生成物，不进入 Git。完整信息见 repo_lucent_report.md / repo_lucent.json。*

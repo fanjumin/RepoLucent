@@ -30,8 +30,8 @@ os.environ.setdefault("PYTHONUNBUFFERED", "1")
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
-from repo_lens import cli, report_agents as RA          # noqa: E402
-from repo_lens.config import RepoConfig, agents_md_setting  # noqa: E402
+from repo_lucent import cli, report_agents as RA          # noqa: E402
+from repo_lucent.config import RepoConfig, agents_md_setting  # noqa: E402
 
 FIXTURE = HERE / "tests" / "fixture_repo"
 RESULTS: list[dict] = []
@@ -69,19 +69,19 @@ def _mini_repo(root: Path, with_agents: str | None = None) -> Path:
     return root
 
 def _settings_ctx(payload: dict):
-    """把 REPO_LENS_SETTINGS 临时指向给定配置；返回还原函数。"""
+    """把 REPO_LUCENT_SETTINGS 临时指向给定配置；返回还原函数。"""
     p = Path(tempfile.mkdtemp(prefix="agents_set_")) / "settings.json"
     p.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-    old = os.environ.get("REPO_LENS_SETTINGS")
-    os.environ["REPO_LENS_SETTINGS"] = str(p)
-    return lambda: (os.environ.__setitem__("REPO_LENS_SETTINGS", old)
+    old = os.environ.get("REPO_LUCENT_SETTINGS")
+    os.environ["REPO_LUCENT_SETTINGS"] = str(p)
+    return lambda: (os.environ.__setitem__("REPO_LUCENT_SETTINGS", old)
                     if old is not None
-                    else os.environ.pop("REPO_LENS_SETTINGS", None))
+                    else os.environ.pop("REPO_LUCENT_SETTINGS", None))
 
 def _cli(repo: Path, out: Path, extra: list[str]):
     env = dict(os.environ, PYTHONPATH=str(HERE))
-    env.pop("REPO_LENS_SETTINGS", None)
-    cmd = [sys.executable, "-m", "repo_lens", "--repo", str(repo),
+    env.pop("REPO_LUCENT_SETTINGS", None)
+    cmd = [sys.executable, "-m", "repo_lucent", "--repo", str(repo),
            "--out", str(out), "--no-date-dir", "--quiet"] + extra
     r = subprocess.run(cmd, capture_output=True, text=True, env=env,
                        cwd=str(HERE), timeout=600)
@@ -123,8 +123,8 @@ def main() -> int:
 
     # ---- 4) repo 模式：标记块内替换，块外保留且块唯一 ----
     (r3 / "AGENTS.md").write_text(
-        user_md + "\n<!-- repolens:begin auto（本块由 RepoLens 生成，勿手改） -->\n"
-        "旧内容-应被替换\n<!-- repolens:end auto -->\n\n### 尾部手写\n尾部内容\n",
+        user_md + "\n<!-- repolucent:begin auto（本块由 RepoLucent 生成，勿手改） -->\n"
+        "旧内容-应被替换\n<!-- repolucent:end auto -->\n\n### 尾部手写\n尾部内容\n",
         encoding="utf-8")
     RA.emit_agents_md(cfg3, data3, "repo")
     t4 = (r3 / "AGENTS.md").read_text(encoding="utf-8")

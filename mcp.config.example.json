@@ -2,11 +2,11 @@
   "mcpServers": {
     "verorun-insight": {
       "command": "python",
-      "args": ["-m", "repo_lens", "mcp", "--repo", "${VR_REPO}"],
+      "args": ["-m", "repo_lucent", "mcp", "--repo", "${VR_REPO}"],
       "env": {
-        "PYTHONPATH": "${REPO_LENS_HOME}"
+        "PYTHONPATH": "${REPO_LUCENT_HOME}"
       },
-      "comment": "不要写死绝对路径。REPO_LENS_HOME = 含 repo_lens 包的目录（即 repolens.py 所在目录）；VR_REPO = 待分析仓库根。部署时通过环境变量或配置注入实际值；若已 `pip install -e .`，可省略 PYTHONPATH 字段。"
+      "comment": "不要写死绝对路径。REPO_LUCENT_HOME = 含 repo_lucent 包的目录（即 repolucent.py 所在目录）；VR_REPO = 待分析仓库根。部署时通过环境变量或配置注入实际值；若已 `pip install -e .`，可省略 PYTHONPATH 字段。"
     }
   }
 }

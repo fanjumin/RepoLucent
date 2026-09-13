@@ -18,10 +18,10 @@ from pathlib import Path
 
 import pytest
 
-from repo_lens.cache import cache_key
-from repo_lens.config import RepoConfig
-from repo_lens.fs_scan import count_lines, decode_text
-from repo_lens.py_ast import (_failed_entry, _parse_one, _up,
+from repo_lucent.cache import cache_key
+from repo_lucent.config import RepoConfig
+from repo_lucent.fs_scan import count_lines, decode_text
+from repo_lucent.py_ast import (_failed_entry, _parse_one, _up,
                               parse_files_parallel, parse_python_file,
                               resolve_workers)
 
@@ -459,7 +459,7 @@ def test_symlink_loop_terminates(tmp_path):
         pytest.skip("当前环境不允许创建目录符号链接（需管理员权限）")
     cfg = RepoConfig(repo_root=root, out_dir=tmp_path / "out")
     cfg.follow_symlinks = False
-    from repo_lens.fs_scan import invalidate_walk_index, iter_repo_files
+    from repo_lucent.fs_scan import invalidate_walk_index, iter_repo_files
     invalidate_walk_index()
     names = [rel.as_posix() for rel, _ in iter_repo_files(cfg)]
     assert "plugins/a.py" in names

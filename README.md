@@ -1,10 +1,10 @@
-# RepoLens
+# RepoLucent
 
 > 通用 Python 仓库架构洞察工具 —— 本地私有化代码库事实源：**分析 / 门禁 / 审计 / MCP 按需供给**。
 > 纯 Python 标准库，零第三方运行时依赖，离线可用，产物确定性可 diff。
 
-**English (one-page)**: RepoLens turns any Python repository into a deterministic,
-structured *fact source* (`repo_lens.json` + Markdown/HTML/AI-context/AGENTS.md/symbols),
+**English (one-page)**: RepoLucent turns any Python repository into a deterministic,
+structured *fact source* (`repo_lucent.json` + Markdown/HTML/AI-context/AGENTS.md/symbols),
 with architecture gates, an audit engine, a local web console, and an MCP server
 (stdio + HTTP) so AI agents can query context on demand. Pure standard library,
 no runtime dependencies, fully offline.
@@ -15,18 +15,18 @@ no runtime dependencies, fully offline.
 
 ```bash
 # 方式一：直接运行（推荐；零安装）
-python repolens.py --repo <仓库根目录>
+python repolucent.py --repo <仓库根目录>
 
-# 方式二：pip 安装后获得 repolens 命令（仍零运行时依赖）
+# 方式二：pip 安装后获得 repolucent 命令（仍零运行时依赖）
 pip install -e .
-repolens --repo <仓库根目录> --summary-only
+repolucent --repo <仓库根目录> --summary-only
 
 # 无子命令即全量分析；自动定位仓库（脚本位于 <repo>/tools/... 时）
-python repolens.py --summary-only
+python repolucent.py --summary-only
 ```
 
-分析产物写入 `<out>/<仓库名>/<日期>/`：`repo_lens.json`（唯一事实源）、
-`repo_lens_report.md|html`、`AI_CONTEXT.md`、`repo_lens_symbols.json`（符号倒排索引）、
+分析产物写入 `<out>/<仓库名>/<日期>/`：`repo_lucent.json`（唯一事实源）、
+`repo_lucent_report.md|html`、`AI_CONTEXT.md`、`repo_lucent_symbols.json`（符号倒排索引）、
 `AGENTS.md`（Agent 原生约束文件，默认只落产物目录）。
 `--only json,md,html,ai,agents,symbols` 可裁剪产物集合。
 
@@ -52,7 +52,7 @@ python repolens.py --summary-only
 ## AGENTS.md（Agent 原生上下文）
 
 主流编码 Agent（Codex / Cursor / Jules / Claude Code / Copilot / Devin）会在仓库根读取
-`AGENTS.md`。RepoLens 可把既有分析事实重排为该文件，三态可选：
+`AGENTS.md`。RepoLucent 可把既有分析事实重排为该文件，三态可选：
 
 | 模式 | 行为 | 适用 |
 |---|---|---|
@@ -60,17 +60,17 @@ python repolens.py --summary-only
 | `repo` | 写仓库根 `AGENTS.md`：已有标记块则块内替换（块外手写内容一字不动），无标记块则追加 | 团队统一上下文，建议 commit 共享 |
 | `off` | 不生成 | 不需要 |
 
-开关优先级：CLI `--agents-md` > 环境变量 `REPO_LENS_AGENTS_MD` > `settings.output.agents_md`
+开关优先级：CLI `--agents-md` > 环境变量 `REPO_LUCENT_AGENTS_MD` > `settings.output.agents_md`
 > 默认 `workspace`。生成幂等（连跑两次逐字节一致）；标记块匹配与品牌解耦，
 更名后旧块仍可被识别更新。
 
 ## 产物契约（JSON Schema）
 
-`repo_lens.json` 的字段契约见 `repo_lens/schemas/repo_lens.schema.json`，配套纯标准库
+`repo_lucent.json` 的字段契约见 `repo_lucent/schemas/repo_lucent.schema.json`，配套纯标准库
 轻校验器（不依赖 jsonschema，支持 `type`/`required`/`properties`/`items`/`enum`/本地 `$ref`）：
 
 ```bash
-python -m repo_lens.schema_check <out>/<repo>/<date>/repo_lens.json
+python -m repo_lucent.schema_check <out>/<repo>/<date>/repo_lucent.json
 ```
 
 `SCHEMA_VERSION` 走 MAJOR.MINOR：MAJOR 破坏产物契约；MINOR 只增可选字段，
@@ -85,38 +85,38 @@ python -m repo_lens.schema_check <out>/<repo>/<date>/repo_lens.json
 
 ## 安全模型（本地控制台）
 
-`repolens serve` 默认只绑定 `127.0.0.1`，并实施四层递进防护（v1.5.1 起）：
+`repolucent serve` 默认只绑定 `127.0.0.1`，并实施四层递进防护（v1.5.1 起）：
 
 1. **L1 Host 白名单** —— 请求 Host 头必须属于 `127.0.0.1 / localhost / ::1`，否则 403（封死 DNS rebinding）；
 2. **L2 Origin 校验** —— POST 带 Origin 头时必须为本地来源，否则 403；
-3. **L3 Token 鉴权** —— `/api/*` 与 `/mcp` 需要令牌（`Authorization: Bearer <t>` 或 `X-RepoLens-Token: <t>`）；
-   启动时自动生成并打印，或用环境变量 `REPOLENS_TOKEN` 固定（MCP 客户端复用）；
-   显式设 `REPOLENS_TOKEN=""` 可退回无鉴权模式（仅本机自担风险，启动横幅红色警告）；
+3. **L3 Token 鉴权** —— `/api/*` 与 `/mcp` 需要令牌（`Authorization: Bearer <t>` 或 `X-RepoLucent-Token: <t>`）；
+   启动时自动生成并打印，或用环境变量 `REPOLUCENT_TOKEN` 固定（MCP 客户端复用）；
+   显式设 `REPOLUCENT_TOKEN=""` 可退回无鉴权模式（仅本机自担风险，启动横幅红色警告）；
 4. **最小豁免** —— 仅 `GET /`（token 注入页面 JS 上下文）与 `/static/*`（目录穿越防护保留）免令牌。
 
 MCP HTTP 客户端配置示例：
 
 ```json
-{ "mcpServers": { "repolens": {
+{ "mcpServers": { "repolucent": {
     "transport": "http",
     "url": "http://127.0.0.1:8788/mcp",
-    "headers": { "X-RepoLens-Token": "<启动横幅打印的令牌或 REPOLENS_TOKEN>" }
+    "headers": { "X-RepoLucent-Token": "<启动横幅打印的令牌或 REPOLUCENT_TOKEN>" }
 } } }
 ```
 
-stdio 通道（`repolens mcp`）不经过 HTTP，无需令牌。
+stdio 通道（`repolucent mcp`）不经过 HTTP，无需令牌。
 
 ## 配置
 
-配置外部化：`repo_lens/settings.default.json`（包内默认）→ `~/.repolens/settings.json`（用户级）
-→ `<工具根>/settings.json`（项目级）→ `REPOLENS_SETTINGS` 环境变量（显式指定）。
+配置外部化：`repo_lucent/settings.default.json`（包内默认）→ `~/.repolucent/settings.json`（用户级）
+→ `<工具根>/settings.json`（项目级）→ `REPOLUCENT_SETTINGS` 环境变量（显式指定）。
 密钥（LLM api_key 等）**只**走环境变量（`key_env` / `base_url_env` 指向），绝不落盘。
 详见 [SETTINGS.md](SETTINGS.md)。
 
 ### 能力分层与执行边界（v1.8.0）
 
-内核（`repo_lens/*.py` + `registry.core.json`）只保留**通用只读分析**能力；
-「写能力」与「业务探针」收敛到 `repo_lens/packs/<name>/` 两个明确目录——
+内核（`repo_lucent/*.py` + `registry.core.json`）只保留**通用只读分析**能力；
+「写能力」与「业务探针」收敛到 `repo_lucent/packs/<name>/` 两个明确目录——
 安全审计面由「整个包」收敛到「两个目录」，按场景分发的体量也随之变小。
 
 | pack | 内容 | 承载能力 |
@@ -180,7 +180,7 @@ stdio 通道（`repolens mcp`）不经过 HTTP，无需令牌。
 > v1.8.0 起由热点增量缓存消解（见上表）。
 >
 > 缓存态字段**刻意不写入任何产物**（含热点段的 `source`）——冷跑与热跑该值必然不同，
-> 进 `repo_lens.json` 会破坏 `--deterministic` 的可复现性与 golden 层。
+> 进 `repo_lucent.json` 会破坏 `--deterministic` 的可复现性与 golden 层。
 
 ## 测试与回归
 
@@ -207,7 +207,7 @@ pytest --update-golden        # 显式更新 golden 快照（产物变化随之�
 真实仓库性能**只做人工采集、不进 CI 硬门禁**（共享盘/网络盘抖动可达数倍，精细阈值必然误报）：
 
 ```bash
-REPOLENS_PERF_REPO=F:\Sites\VeroRun pytest tests/perf -s
+REPOLUCENT_PERF_REPO=F:\Sites\VeroRun pytest tests/perf -s
 ```
 
 ## 许可证

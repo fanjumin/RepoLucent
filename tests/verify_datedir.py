@@ -4,11 +4,11 @@
   1) apply_date_dir 默认开启：out_dir == <base>/<YYYY-MM-DD>，稳定根 == base
   2) enabled=False：out_dir == base（历史行为不变）
   3) settings.output.date_dir=false → 开关生效（关）
-  4) 环境变量 REPO_LENS_DATE_DIR=0 覆盖 settings（关）
+  4) 环境变量 REPO_LUCENT_DATE_DIR=0 覆盖 settings（关）
   5) 缓存/基线留稳定根：cache_dir、snapshot_dir 均为 base，且 != out_dir
   6) latest_artifact_dir / list_artifact_dirs 往返（多日期目录倒序）
-  7) CLI e2e 默认归档：产物落在 <out>/<date>/repo_lens.json
-  8) CLI e2e --no-date-dir：产物落在 <out>/repo_lens.json（旧行为）
+  7) CLI e2e 默认归档：产物落在 <out>/<date>/repo_lucent.json
+  8) CLI e2e --no-date-dir：产物落在 <out>/repo_lucent.json（旧行为）
   9) HTTP /api/artifacts：artifact_root / current / runs 正确
 
 输出纯 ASCII JSON 到 out/datedir_verify.json。
@@ -31,10 +31,10 @@ os.environ.setdefault("PYTHONUNBUFFERED", "1")
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
-from repo_lens import cli  # noqa: E402
-from repo_lens.config import (RepoConfig, apply_date_dir, date_dir_setting,  # noqa: E402
+from repo_lucent import cli  # noqa: E402
+from repo_lucent.config import (RepoConfig, apply_date_dir, date_dir_setting,  # noqa: E402
                               latest_artifact_dir, list_artifact_dirs)
-from repo_lens.server import _Handler, ThreadingHTTPServer  # noqa: E402
+from repo_lucent.server import _Handler, ThreadingHTTPServer  # noqa: E402
 
 PORT = 8809
 RESULTS = []
@@ -50,11 +50,11 @@ def _write_settings(d: dict) -> Path:
     return p
 
 def _with_settings(d: dict):
-    """临时把 REPO_LENS_SETTINGS 指向给定配置（settings 模块带缓存，需清缓存）。"""
-    from repo_lens import settings as S
+    """临时把 REPO_LUCENT_SETTINGS 指向给定配置（settings 模块带缓存，需清缓存）。"""
+    from repo_lucent import settings as S
     p = _write_settings(d)
-    old = os.environ.get("REPO_LENS_SETTINGS")
-    os.environ["REPO_LENS_SETTINGS"] = str(p)
+    old = os.environ.get("REPO_LUCENT_SETTINGS")
+    os.environ["REPO_LUCENT_SETTINGS"] = str(p)
     for attr in ("_CACHE", "_LOADED", "_SETTINGS"):
         if hasattr(S, attr):
             try:
@@ -69,11 +69,11 @@ def _with_settings(d: dict):
     return old, p
 
 def _restore_settings(old):
-    from repo_lens import settings as S
+    from repo_lucent import settings as S
     if old is None:
-        os.environ.pop("REPO_LENS_SETTINGS", None)
+        os.environ.pop("REPO_LUCENT_SETTINGS", None)
     else:
-        os.environ["REPO_LENS_SETTINGS"] = old
+        os.environ["REPO_LUCENT_SETTINGS"] = old
     for attr in ("_CACHE", "_LOADED", "_SETTINGS"):
         if hasattr(S, attr):
             try:
@@ -89,8 +89,8 @@ def _restore_settings(old):
 def _cli(repo: Path, out: Path, extra: list[str]):
     env = dict(os.environ)
     env["PYTHONPATH"] = str(HERE)
-    env.pop("REPO_LENS_SETTINGS", None)
-    cmd = [sys.executable, "-m", "repo_lens", "--repo", str(repo),
+    env.pop("REPO_LUCENT_SETTINGS", None)
+    cmd = [sys.executable, "-m", "repo_lucent", "--repo", str(repo),
            "--out", str(out), "--only", "json", "--quiet"] + extra
     r = subprocess.run(cmd, capture_output=True, text=True, env=env,
                        cwd=str(HERE), timeout=600)
@@ -127,17 +127,17 @@ def main() -> int:
             _restore_settings(old_s)
         record("datedir_settings_off", got3 is False, f"enabled={got3}")
 
-        # ---- 4) 环境变量 REPO_LENS_DATE_DIR=0 覆盖 ----
+        # ---- 4) 环境变量 REPO_LUCENT_DATE_DIR=0 覆盖 ----
         old_s, _p = _with_settings({"output": {"date_dir": True}})
-        old_env = os.environ.get("REPO_LENS_DATE_DIR")
-        os.environ["REPO_LENS_DATE_DIR"] = "0"
+        old_env = os.environ.get("REPO_LUCENT_DATE_DIR")
+        os.environ["REPO_LUCENT_DATE_DIR"] = "0"
         try:
             got4 = date_dir_setting()[0]
         finally:
             if old_env is None:
-                os.environ.pop("REPO_LENS_DATE_DIR", None)
+                os.environ.pop("REPO_LUCENT_DATE_DIR", None)
             else:
-                os.environ["REPO_LENS_DATE_DIR"] = old_env
+                os.environ["REPO_LUCENT_DATE_DIR"] = old_env
             _restore_settings(old_s)
         record("datedir_env_override", got4 is False, f"enabled={got4}")
 
@@ -151,8 +151,8 @@ def main() -> int:
         hist = out / "hist"
         (hist / "2026-01-01").mkdir(parents=True)
         (hist / "2026-09-12").mkdir(parents=True)
-        (hist / "2026-01-01" / "repo_lens.json").write_text("{}", encoding="utf-8")
-        (hist / "2026-09-12" / "repo_lens.json").write_text("{}", encoding="utf-8")
+        (hist / "2026-01-01" / "repo_lucent.json").write_text("{}", encoding="utf-8")
+        (hist / "2026-09-12" / "repo_lucent.json").write_text("{}", encoding="utf-8")
         (hist / "_latest.txt").write_text("2026-09-12\n", encoding="utf-8")
         runs = list_artifact_dirs(hist)
         lat = latest_artifact_dir(hist)
@@ -165,14 +165,14 @@ def main() -> int:
         # ---- 7) CLI e2e 默认归档 ----
         cli_out7 = out / "cli7"
         rc7, log7 = _cli(repo, cli_out7, [])
-        f7 = cli_out7 / TODAY / "repo_lens.json"
+        f7 = cli_out7 / TODAY / "repo_lucent.json"
         ok7 = rc7 == 0 and f7.is_file()
         record("cli_e2e_datedir", ok7, f"rc={rc7} exists={f7.is_file()} path={f7}")
 
         # ---- 8) CLI e2e --no-date-dir ----
         cli_out8 = out / "cli8"
         rc8, log8 = _cli(repo, cli_out8, ["--no-date-dir"])
-        f8 = cli_out8 / "repo_lens.json"
+        f8 = cli_out8 / "repo_lucent.json"
         ok8 = rc8 == 0 and f8.is_file()
         record("cli_e2e_no_datedir", ok8, f"rc={rc8} exists={f8.is_file()} path={f8}")
 

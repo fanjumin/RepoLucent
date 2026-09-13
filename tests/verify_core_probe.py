@@ -2,7 +2,7 @@
 """无删除探针：复刻 verify_settings / verify_profile 在 settings.py 后续改动
 （profile 按仓覆盖）后的关键断言。全程不删除任何文件（临时目录不清理）。
 
-  1) settings 搜索链：REPO_LENS_SETTINGS 环境文件覆盖包内默认
+  1) settings 搜索链：REPO_LUCENT_SETTINGS 环境文件覆盖包内默认
   2) get_secret 新旧前缀别名回落
   3) profile 按仓覆盖：generic-python → 组件短路；None → 内置 verorun 回落
   4) ToolConfig.from_settings 注入 max_*
@@ -23,39 +23,39 @@ def record(name, ok, detail=""):
     print(f"[{'PASS' if ok else 'FAIL'}] {name} :: {detail}")
 
 def main() -> int:
-    from repo_lens import config
-    from repo_lens.settings import (load_settings, get_secret, set_profile_override,
+    from repo_lucent import config
+    from repo_lucent.settings import (load_settings, get_secret, set_profile_override,
                                     profile_get)
 
     # ---- 1) 搜索链覆盖 ----
     td = tempfile.mkdtemp(prefix="core_probe_")
     env_file = Path(td) / "settings.json"
     env_file.write_text(json.dumps({"max_plugins_in_ai_context": 10}), encoding="utf-8")
-    old = os.environ.get("REPO_LENS_SETTINGS")
-    os.environ["REPO_LENS_SETTINGS"] = str(env_file)
+    old = os.environ.get("REPO_LUCENT_SETTINGS")
+    os.environ["REPO_LUCENT_SETTINGS"] = str(env_file)
     try:
         merged = load_settings()
         ok1 = merged.get("max_plugins_in_ai_context") == 10
         record("settings_chain_env_override", ok1, f"max_plugins={merged.get('max_plugins_in_ai_context')}")
     finally:
         if old is None:
-            os.environ.pop("REPO_LENS_SETTINGS", None)
+            os.environ.pop("REPO_LUCENT_SETTINGS", None)
         else:
-            os.environ["REPO_LENS_SETTINGS"] = old
+            os.environ["REPO_LUCENT_SETTINGS"] = old
 
     # ---- 2) get_secret 新旧前缀别名 ----
     os.environ["VR_INSIGHT_TEST_ALIAS_KEY"] = "legacy-secret"
-    os.environ.pop("REPO_LENS_TEST_ALIAS_KEY", None)
-    ok2 = get_secret("REPO_LENS_TEST_ALIAS_KEY") == "legacy-secret"
-    os.environ["REPO_LENS_TEST_ALIAS_KEY"] = "new-secret"
-    ok2 = ok2 and get_secret("REPO_LENS_TEST_ALIAS_KEY") == "new-secret"
-    for k in ("VR_INSIGHT_TEST_ALIAS_KEY", "REPO_LENS_TEST_ALIAS_KEY"):
+    os.environ.pop("REPO_LUCENT_TEST_ALIAS_KEY", None)
+    ok2 = get_secret("REPO_LUCENT_TEST_ALIAS_KEY") == "legacy-secret"
+    os.environ["REPO_LUCENT_TEST_ALIAS_KEY"] = "new-secret"
+    ok2 = ok2 and get_secret("REPO_LUCENT_TEST_ALIAS_KEY") == "new-secret"
+    for k in ("VR_INSIGHT_TEST_ALIAS_KEY", "REPO_LUCENT_TEST_ALIAS_KEY"):
         os.environ.pop(k, None)
     record("get_secret_legacy_alias", ok2)
 
     # ---- 3) profile 按仓覆盖往返（fixture 稳定，CI 永远全绿）----
-    from repo_lens.cli import (_build_argparser, _setup, _analyze, _write_reports)
-    from repo_lens.plugin_analyzer import analyze_plugins
+    from repo_lucent.cli import (_build_argparser, _setup, _analyze, _write_reports)
+    from repo_lucent.plugin_analyzer import analyze_plugins
     cfg = _setup(_build_argparser().parse_args(
         ["--repo", str(HERE / "tests" / "fixture_repo"),
          "--out", str(Path(td) / "out")]))
@@ -71,17 +71,17 @@ def main() -> int:
            f"short_circuit={short} builtin_restore={back}")
 
     # ---- 4) ToolConfig 注入 ----
-    from repo_lens.config import ToolConfig
+    from repo_lucent.config import ToolConfig
     tc = ToolConfig.from_settings()
     ok4 = cfg.max_plugins_in_ai_context == tc.max_plugins_in_ai_context
     record("toolconfig_injection", ok4,
            f"max_plugins={cfg.max_plugins_in_ai_context}")
 
-    # ---- 5) 真实仓库分析探针（阶段四：opt-in，REPOLENS_REAL_REPO 触发真实分析）----
+    # ---- 5) 真实仓库分析探针（阶段四：opt-in，REPOLUCENT_REAL_REPO 触发真实分析）----
     # 此前该用例仅 record SKIPPED、未真正分析，DoD 真实仓核验靠手动 CLI 闭合；
     # 现改为：设了环境变量即真正跑 _analyze + _write_reports 并断言真实产物。
     # 全程不删除、不污染仓库（产物写临时 out）。未设则维持 SKIPPED（CI 绿）。
-    real_repo = os.environ.get("REPOLENS_REAL_REPO")
+    real_repo = os.environ.get("REPOLUCENT_REAL_REPO")
     if real_repo and Path(real_repo).is_dir():
         rargs = _build_argparser().parse_args(
             ["--repo", real_repo, "--out", str(Path(td) / "real_out")])
@@ -103,7 +103,7 @@ def main() -> int:
                f"overview_ok={bool(rdata.get('overview'))}")
     else:
         record("real_repo_probe", True,
-               "SKIPPED: 未设置 REPOLENS_REAL_REPO 环境变量"
+               "SKIPPED: 未设置 REPOLUCENT_REAL_REPO 环境变量"
                "（设为 VeroRun 仓库根后重跑即触发真实分析）")
 
     out_file = HERE / "out" / "core_probe_verify.json"

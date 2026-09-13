@@ -6,10 +6,10 @@ TOOL_VERSION 与产物解耦，任意变更都可递增。
 
 ## [2.0.0] - 2026-09-13
 
-阶段 F 收口：规则引擎（`repo_lens/rules/`），完成《repolens升级实施方案 v1.5.1→v2.0.0》的最后一关，工具抵达 2.0.0 里程碑。
+阶段 F 收口：规则引擎（`repo_lucent/rules/`），完成《repolucent升级实施方案 v1.5.1→v2.0.0》的最后一关，工具抵达 2.0.0 里程碑。
 
 ### Added
-- 规则引擎 `repo_lens/rules/`（6 文件）：`_types.py`（Finding + 共享 AST 工具）、`spec.py` / `security.py` / `architecture.py` / `complexity.py` 四类 15 条规则、`__init__.py`（注册表 + `run_rules` 汇总）。
+- 规则引擎 `repo_lucent/rules/`（6 文件）：`_types.py`（Finding + 共享 AST 工具）、`spec.py` / `security.py` / `architecture.py` / `complexity.py` 四类 15 条规则、`__init__.py`（注册表 + `run_rules` 汇总）。
 - 15 条规则：SPEC001-005（manifest/规范）、SEC001-004（硬编码密钥 / eval-exec / subprocess shell=True / SQL 拼接）、ARCH001-004（核心直导插件 / 插件环依赖 / 私有连接池 / 路由前缀）、CMP001-002（单文件行数 / 单函数体行数）。
 - 产物新增可选顶层字段 `findings`（schema_version=1.0 / summary / items），由 `_analyze_compute` 收尾写入；`SCHEMA_VERSION` 1.3 → 1.4（MINOR，不破坏契约）。
 - `gate.py` 新增门禁项 `findings`：`--fail-on findings` 在存在 error 级 finding 时返回退出码 1（warning/info 不计入，与文档一致）。
@@ -29,17 +29,17 @@ TOOL_VERSION 与产物解耦，任意变更都可递增。
 
 ## [1.8.0] - 2026-09-13
 
-阶段三：工程化收口（依据《repolens升级实施方案 v1.5.1→v2.0.0》§5）。三件事：
+阶段三：工程化收口（依据《repolucent升级实施方案 v1.5.1→v2.0.0》§5）。三件事：
 让「写能力」离开只读内核（3-A）、让 `query` 不必每次全量分析（3-B）、
 并把多 kind 适配器与 LLM 流式两个遗留项收口（3-C）。
 **产物契约仍未变**（`SCHEMA_VERSION` 保持 1.3，理由见 `__init__.py` 版本沿革注释）。
 
 ### Added
-- **3-A pack 分层**（`repo_lens/packs/`）：把「写能力」与「业务探针」从只读内核剥离为
+- **3-A pack 分层**（`repo_lucent/packs/`）：把「写能力」与「业务探针」从只读内核剥离为
   两个可按场景分发的包。
   - `packs/gitflow/`：`push` / `pull` / `sync` / `group` / `batch` 五个子命令及其实现
-    （原 `repo_lens/` 下的同名模块迁入）；`packs/verorun/`：`store_probe` /
-    `ssh_readonly_probe` 两个业务探针（原 `repo_lens/scriptlib/` 下迁入）。
+    （原 `repo_lucent/` 下的同名模块迁入）；`packs/verorun/`：`store_probe` /
+    `ssh_readonly_probe` 两个业务探针（原 `repo_lucent/scriptlib/` 下迁入）。
   - 启用策略 `settings.packs.enabled`：`null`（缺省）= 按 profile 默认；
     `[]` = **纯只读内核**；`["gitflow"]` = 仅启用列出者。内置 `verorun` profile
     默认启用全部 pack，**既有用户行为零变化**（这是本改造的硬约束）。
@@ -48,12 +48,12 @@ TOOL_VERSION 与产物解耦，任意变更都可递增。
     始终可导入——「未启用」不作用于导入层，语义清晰且不脆。
   - 未启用时命令不进 argparse；直接调用命中「pack disabled」提示并 rc=2
     （`cli._PackAwareParser`），提示中给出当前生效 / 可用 pack 与启用方法。
-  - `repo_lens/registry.core.json` 成为内核脚本的单一事实源（原 `registry.json`
+  - `repo_lucent/registry.core.json` 成为内核脚本的单一事实源（原 `registry.json`
     归档）；聚合注册表 = 内核 + 各启用 pack 的 `registry.json`。
     `scriptlib/adapters/base.py:ALLOWED_ENTRY_PREFIXES` 扩为
-    `("repo_lens.scriptlib.", "repo_lens.packs.")`，作为 entry 白名单的**单一事实源**
+    `("repo_lucent.scriptlib.", "repo_lucent.packs.")`，作为 entry 白名单的**单一事实源**
     （`script_cmd._ALLOWED_PKGS` 与之由 `verify_packs` 断言一致，防双源分叉）。
-- **3-B `query` 的 SQLite 加速层**（`repo_lens/index_db.py`，`index.db` 落 `cfg.cache_dir`）。
+- **3-B `query` 的 SQLite 加速层**（`repo_lucent/index_db.py`，`index.db` 落 `cfg.cache_dir`）。
   定位是**加速层而非事实源**：`query` 原先必须先跑完整分析才能查询，现在库新鲜时
   直接取行 → 毫秒级。关键设计是「取回**原始行 payload** → 复用
   `query.run_query(rows=...)` 同一段投影 / 过滤代码」，故加速路径与全量分析路径的
@@ -122,7 +122,7 @@ TOOL_VERSION 与产物解耦，任意变更都可递增。
   signature(p) != rec["sig"]` 证伪。连跑 5 次全绿。
 - **热点缓存态字段 `source` 曾进入事实源产物**（本阶段自查发现并修）：`analyze_hotspots`
   新增的 `source`（`head_hit` / `incremental` / `full`）被直接并入 `data["hotspots"]`，
-  而它是**纯缓存态派生量**——同一输出目录二次运行必然取到不同值，进入 `repo_lens.json`
+  而它是**纯缓存态派生量**——同一输出目录二次运行必然取到不同值，进入 `repo_lucent.json`
   即破坏 `--deterministic` 的可复现性（与 v1.7.0 已确立的「2-B 缓存统计刻意不写进任何
   产物」同一原则）。已在 CLI 边界剥离；该字段仍保留在 `analyze_hotspots` 的返回值中，
   供诊断与 `verify_hotspot` 断言。
@@ -170,7 +170,7 @@ TOOL_VERSION 与产物解耦，任意变更都可递增。
 
 ### 阶段四（验证与压测增强，2026-09-13 续）
 - **`verify_core_probe` 真实分析语义修正**：`real_repo_probe` 用例从「仅 record SKIPPED」
-  升级为 **opt-in 真实分析**——设 `REPOLENS_REAL_REPO` 后即真正跑 `_analyze` + `_write_reports`
+  升级为 **opt-in 真实分析**——设 `REPOLUCENT_REAL_REPO` 后即真正跑 `_analyze` + `_write_reports`
   并断言（`plugins>0` / `hotspots` 存在 / `meta.duration_ms>0` / `overview` 存在），使 DoD 真实仓
   核验闭合进套件而非靠手动 CLI。未设环境变量时维持 `SKIPPED=True`，CI 全绿（5/5）。
 - **新增 `measure_wallclock.py`（阶段四 2a，零产品改动）**：对真实仓做冷/热两遍全流水线计时，
@@ -189,7 +189,7 @@ TOOL_VERSION 与产物解耦，任意变更都可递增。
 
 ## [1.7.0] - 2026-09-13
 
-阶段二：性能与测试结构（依据《repolens升级实施方案 v1.5.1→v2.0.0》§4）。
+阶段二：性能与测试结构（依据《repolucent升级实施方案 v1.5.1→v2.0.0》§4）。
 本阶段只做一件事的两面：让「重复运行」变快（2-A 并行 + 2-B 增量），
 并给这份变快加上不依赖人眼的证据（2-C 测试金字塔）。**产物契约未变**
 （`SCHEMA_VERSION` 保持 1.3，无字段增删改），故本版为纯 MINOR。
@@ -199,7 +199,7 @@ TOOL_VERSION 与产物解耦，任意变更都可递增。
   `parse_files_parallel()`。批量 ≥ `PARALLEL_MIN_FILES`(200) 且 `workers != 1` 时走
   `ProcessPoolExecutor(chunksize=16)`，否则串行。Windows spawn 三条铁律全部满足：
   worker 为顶层函数、只接收 `(绝对路径, 相对路径)` 字符串元组（**文件内容由 worker
-  自读**，主进程零 pickle 负载）、入口 `repolens.py` 与 `repo_lens/__main__.py` 均具备
+  自读**，主进程零 pickle 负载）、入口 `repolucent.py` 与 `repo_lucent/__main__.py` 均具备
   `if __name__ == "__main__"` 守卫。并行侧任何异常自动回退串行。
   新增 `--workers N` 与 `settings.analysis.workers`（`0`=auto=`min(CPU,4)`）。
 - **2-B 内容寻址增量缓存**（`cache.py`）：缓存判定改为**双层**——
@@ -220,15 +220,15 @@ TOOL_VERSION 与产物解耦，任意变更都可递增。
     `new` / `entry_missing` / `stat_error`）、**「签名命中不读盘」用「删掉文件后仍命中」
     证明**、记录哈希优先于台账、截断口径、缓存与台账的损坏/版本失配回源。
   - `tests/golden/`（8 用例 + 5 件快照）：fixture 仓库 `--deterministic` 下
-    `repo_lens.json` / `repo_lens_report.md` / `AI_CONTEXT.md` / `AGENTS.md` /
-    `repo_lens_symbols.json` **逐字节**快照，`pytest --update-golden` 显式更新，
+    `repo_lucent.json` / `repo_lucent_report.md` / `AI_CONTEXT.md` / `AGENTS.md` /
+    `repo_lucent_symbols.json` **逐字节**快照，`pytest --update-golden` 显式更新，
     失败时输出首个差异的紧凑 unified diff 而非整份产物。
     另含**跨绝对路径稳定性**用例（同内容仓库在不同路径下必须产出逐字节相同产物），
     这是快照可进 Git、可跨机器复现的前提。
   - `tests/perf/test_budget.py`（5 用例）：fixture 冷/热跑的宽松耗时预算，
     以及两条**不依赖机器性能**的结构性门禁——小批量**不得**启动进程池、
     `workers=1` 必须串行（用 monkeypatch 让 `ProcessPoolExecutor` 构造即抛异常来证伪）。
-    真实仓库指标仅人工采集（`REPOLENS_PERF_REPO=<仓库> pytest tests/perf -s`），
+    真实仓库指标仅人工采集（`REPOLUCENT_PERF_REPO=<仓库> pytest tests/perf -s`），
     刻意不进 CI 硬门禁。
   - 单元 / golden / perf 三个标记登记进 `pyproject.toml`，便于按层单跑。
 
@@ -239,7 +239,7 @@ TOOL_VERSION 与产物解耦，任意变更都可递增。
   CLI `--workers` 最高优先。`analysis` 段缺失或类型不对时回退 `0`(auto)，不抛异常。
 - `_analyze_compute()` 的 AST 预热重构为「**判定与解析分离**」：主进程逐文件做廉价
   判定（签名 + 必要时的哈希），未命中项收集后交给进程池。串行/并行产出的
-  `repo_lens.json` 与 `repo_lens_symbols.json` 经逐字节比对确认完全一致。
+  `repo_lucent.json` 与 `repo_lucent_symbols.json` 经逐字节比对确认完全一致。
 - `parse_python_file()` 新增可选参数 `raw: bytes | None`（复用已读内容，避免重复读盘）；
   既有 12 处两参调用（`core_analyzer` / `plugin_analyzer` / `interaction_analyzer` /
   `deep_analyzer`）**签名兼容、无需改动**。
@@ -283,7 +283,7 @@ TOOL_VERSION 与产物解耦，任意变更都可递增。
   因此会出现「报 1.0s、实际墙钟 16.4s」的观感落差。该口径为既有行为，
   修改会影响既有消费方，故本阶段仅在 README/SETTINGS 中显式说明，未改代码。
   （注：2-B 的缓存统计**刻意不写进任何产物**——冷跑与热跑该值必然不同，
-  进 `repo_lens.json` 会破坏 `--deterministic` 的可复现性与 golden 层。）
+  进 `repo_lucent.json` 会破坏 `--deterministic` 的可复现性与 golden 层。）
 - **`PARALLEL_MIN_FILES = 200` 在本机偏保守**：363 个微型文件的合成仓上并行反而慢 14%
   （进程启动开销盖过收益），而 765 个中等文件时快 2.6x。交叉点与「文件平均大小」
   强相关，单一文件数阈值无法同时覆盖两种负载。本阶段按方案原值保留，
@@ -299,18 +299,18 @@ TOOL_VERSION 与产物解耦，任意变更都可递增。
 
 ## [1.6.0] - 2026-09-13
 
-阶段一：生态对齐（依据《repolens升级实施方案 v1.5.1→v2.0.0》§3）。
-本阶段目标是让 RepoLens 进入 2026 年 Agent 生态的原生视野（AGENTS.md），
+阶段一：生态对齐（依据《repolucent升级实施方案 v1.5.1→v2.0.0》§3）。
+本阶段目标是让 RepoLucent 进入 2026 年 Agent 生态的原生视野（AGENTS.md），
 并把已有的分析资产（AST / context / query）以 MCP 一等工具的粒度按需供给。
 
 ### Added
-- **AGENTS.md 兼容产物**（新模块 `report_agents.py`）：把 `repo_lens.json` 既有字段
+- **AGENTS.md 兼容产物**（新模块 `report_agents.py`）：把 `repo_lucent.json` 既有字段
   （overview / core / plugins / standards / interactions）重排为 Agent 原生可读的
   速览 + 组件契约 + 清单必填/枚举 + 惯例统计 + 架构红线 + 命令速查 + 文档索引。
   三态输出，默认 `workspace`（写产物目录，**绝不触碰仓库根**）：
   `repo` 模式在 `<!-- …:begin auto -->`/`<!-- …:end auto -->` 标记块内原块替换，
   块外用户手写内容一字不动；`off` 不生成。
-  配置：`settings.output.agents_md`，或环境变量 `REPO_LENS_AGENTS_MD`，
+  配置：`settings.output.agents_md`，或环境变量 `REPO_LUCENT_AGENTS_MD`，
   或 CLI `--agents-md repo|workspace|off`（优先级 CLI > env > settings > 默认）。
   标记块**匹配**与品牌解耦（正则只认 `:begin auto`/`:end auto` 词形），
   为 v2.0.0 更名预留：改名前写下的块，改名后仍能被识别更新。
@@ -324,21 +324,21 @@ TOOL_VERSION 与产物解耦，任意变更都可递增。
   class / function / route 三类；路径统一归一 POSIX 斜杠（消除 Windows 反斜杠导致
   的产物漂移）；owner 由路径派生（`plugins/<id>/…` → `<id>`，其余取顶层目录）；
   路由 rule 去掉 `ast.unparse` 的成对引号，使 URL 可直接精确命中。
-  完整索引落独立产物 `repo_lens_symbols.json`，主 JSON 只增轻量 `symbols`
+  完整索引落独立产物 `repo_lucent_symbols.json`，主 JSON 只增轻量 `symbols`
   摘要段（`schema`/`count`/`index_file`）。
-- **CLI 子命令 `search`**：`repolens search <symbol> [--limit N] [--format json|table]`。
+- **CLI 子命令 `search`**：`repolucent search <symbol> [--limit N] [--format json|table]`。
   精确命中优先 → 大小写不敏感子串回退 → 上限 50 + `truncated` 标志。
   退出码对齐 grep：0=有命中 / 1=无命中 / 2=参数或环境错误。
-- **JSON Schema 产物契约**（`repo_lens/schemas/repo_lens.schema.json`，随包分发）
-  与**纯标准库轻校验器** `repo_lens/schema_check.py`：支持 `type`（含联合类型）、
+- **JSON Schema 产物契约**（`repo_lucent/schemas/repo_lucent.schema.json`，随包分发）
+  与**纯标准库轻校验器** `repo_lucent/schema_check.py`：支持 `type`（含联合类型）、
   `required`、`properties`、`items`、`enum`、本地 `$ref`，不引入 jsonschema 依赖。
-  可 CLI 使用：`python -m repo_lens.schema_check <repo_lens.json>`（rc=0/1/2）。
+  可 CLI 使用：`python -m repo_lucent.schema_check <repo_lucent.json>`（rc=0/1/2）。
 - `py_ast` 的类 / 函数 / 路由事实新增 `lineno` 字段（符号定位所需的最小新增）。
 - 新增回归套件 `verify_agents.py`（11 用例）、`verify_symbols.py`（13 用例）、
   `verify_schema.py`（12 用例）；`verify_mcp.py` 增 5 个往返用例
   （repo.context 往返与字节上限、未知目标转 content 错误、repo.query 往返、
   repo.search 命中/未命中）。`_run_regress.py` 由 15 套扩到 18 套。
-- `repo_lens/__init__.py` 集中定义产物文件名常量（`ARTIFACT_*`），
+- `repo_lucent/__init__.py` 集中定义产物文件名常量（`ARTIFACT_*`），
   为 v2.0.0 更名六件套 ④（产物改名）预留单一改动点。
 
 ### Changed
@@ -382,15 +382,15 @@ TOOL_VERSION 与产物解耦，任意变更都可递增。
 | 路由数 | 680 | 680 | ✅ |
 | 总行数 | 27.8 万 | 278,367（其中代码行 234,143） | ✅ |
 
-- 全量耗时 **16,776 ms**；产物 `repo_lens.json` 772 KB、`repo_lens_symbols.json` 1.13 MB
+- 全量耗时 **16,776 ms**；产物 `repo_lucent.json` 772 KB、`repo_lucent_symbols.json` 1.13 MB
   （5482 符号：function 4585 / route 1269 / class 656）。
 - `meta.tool_version = 1.6.0`、`meta.schema_version = 1.3` 正确写入产物。
 - 新增产物在真实规模下生成正常（`AGENTS.md` 4.4 KB / `AI_CONTEXT.md` 7.8 KB /
-  `repo_lens_report.md` 32.8 KB / `repo_lens_report.html` 37.8 KB）；
+  `repo_lucent_report.md` 32.8 KB / `repo_lucent_report.html` 37.8 KB）；
   `AGENTS.md` 走默认 `workspace` 模式写入产物目录，**仓库根原有 `AGENTS.md` 未被触碰**。
 
 ### Notes（本阶段记录在案的既有缺陷，不在本阶段范围）
-- `verify_core_probe.py` 的 `REPOLENS_REAL_REPO` 仅作为 `cfg.repo_root` 路径参数传入
+- `verify_core_probe.py` 的 `REPOLUCENT_REAL_REPO` 仅作为 `cfg.repo_root` 路径参数传入
   （第 68-70 行 `_setup(...)`），**并不触发任何真实仓库分析**——名字暗示"真实仓库探针"，
   实际只服务于 profile / ToolConfig 的取值断言。故 DoD 的真实仓库冒烟由上述直接运行闭合，
   而非由该套件闭合。建议随阶段二「验证套件去名义化」一并修正其语义或改名。
@@ -404,17 +404,17 @@ TOOL_VERSION 与产物解耦，任意变更都可递增。
 
 ## [1.5.1] - 2026-09-13
 
-阶段 P0：安全加固 + 工程化地基（依据《repolens升级实施方案 v1.5.1→v2.0.0》）。
+阶段 P0：安全加固 + 工程化地基（依据《repolucent升级实施方案 v1.5.1→v2.0.0》）。
 
 ### Added
 - **serve 四层安全门控**：L1 Host 白名单（防 DNS rebinding）→ L2 Origin 校验（防跨站 POST）
-  → L3 Token 鉴权（`secrets.token_urlsafe(24)`，恒时比较；`REPOLENS_TOKEN` 环境变量可固定，
+  → L3 Token 鉴权（`secrets.token_urlsafe(24)`，恒时比较；`REPOLUCENT_TOKEN` 环境变量可固定，
   显式空串为降级无鉴权模式）→ L4 最小豁免（仅 `GET /` 与 `/static/*` 免 token）。
-  浏览器 UI 由服务端把 token 注入页面 JS 上下文，`app.js` 统一附带 `X-RepoLens-Token` 头，
+  浏览器 UI 由服务端把 token 注入页面 JS 上下文，`app.js` 统一附带 `X-RepoLucent-Token` 头，
   401 时提示刷新页面。
 - **verify_security.py**（新回归套件，21 用例）：401/403/200 安全矩阵 + 路由注册表回归 +
   豁免面 + 环境变量固定 + 降级模式。
-- **工程化地基**：pyproject.toml（setuptools 后端、`repolens` 入口脚本、`test` 可选依赖组）、
+- **工程化地基**：pyproject.toml（setuptools 后端、`repolucent` 入口脚本、`test` 可选依赖组）、
   LICENSE（团队内部使用许可）、README.md（快速开始 / 子命令表 / 安全模型）、本 CHANGELOG。
 - `_run_regress.py` 纳入 verify_security（14 → 15 套）。
 
@@ -423,14 +423,14 @@ TOOL_VERSION 与产物解耦，任意变更都可递增。
   （43 精确 + 2 前缀），do_GET/do_POST 缩为「门控 → 查表 → 调用 → 统一序列化」；
   每端点一个独立函数，结构上消除「函数内 import 遮蔽外层名字」类缺陷（DONE-14 家族）。
 - verify_cache.py 去绝对路径硬编码（`Path(__file__)` 推导）；
-  verify_core_probe.py 真实仓库探针改 `REPOLENS_REAL_REPO` 环境变量驱动，未设置时显式
+  verify_core_probe.py 真实仓库探针改 `REPOLUCENT_REAL_REPO` 环境变量驱动，未设置时显式
   SKIPPED 并以 fixture 冒烟（任意目录 checkout 全绿）。
 - tests/ 工程化整理：13 个非测试脚本（deploy/gen_dashboard/export_facts 等）迁至 `scripts/`，
   tests/ 只留真测试与 fixture 资产。
 
 ### Fixed
 - 旧名残留清理：`insight pull` 命令建议、`insight context` 用法提示、AI_CONTEXT 切片脚注、
-  diff 报告标题、dashboard 品牌字样统一改为 RepoLens 体系
+  diff 报告标题、dashboard 品牌字样统一改为 RepoLucent 体系
   （保留项：`.insight_cache` 缓存目录名与 `VR_INSIGHT_*`/`~/.repolucent` 兼容回落，
   属 v2.0.0 更名六件套范畴）。
 
@@ -438,7 +438,7 @@ TOOL_VERSION 与产物解耦，任意变更都可递增。
 
 - 新增变更热点分析（hotspots：churn × 体量，借鉴 code-maat/CodeScene 方法论）+ Mermaid 图。
 - `analysis` 段为 MINOR 新增（schema 1.2）。
-- UI 侧栏化：控制台静态资源外置 repo_lens/ui/static（app.js / tokens.css / icons.js）。
+- UI 侧栏化：控制台静态资源外置 repo_lucent/ui/static（app.js / tokens.css / icons.js）。
 
 ## [1.4.0] - 2026-09（回填）
 

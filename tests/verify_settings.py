@@ -24,10 +24,10 @@ from types import SimpleNamespace
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
-from repo_lens.config import ToolConfig
-from repo_lens.cli import _setup
-from repo_lens.settings import load_settings, get_secret
-from repo_lens.report_ai import render_ai_context
+from repo_lucent.config import ToolConfig
+from repo_lucent.cli import _setup
+from repo_lucent.settings import load_settings, get_secret
+from repo_lucent.report_ai import render_ai_context
 
 RESULTS = []
 
@@ -46,13 +46,13 @@ def fake_args(repo: Path, tree_depth=None):
                            extra_repos=None, out=None, module=None, plugin=None)
 
 # ---------------------------------------------------------------- 用例 1/3 ----
-# 无 settings：删除任何 REPO_LENS_SETTINGS 指向，且项目根无 settings.json
+# 无 settings：删除任何 REPO_LUCENT_SETTINGS 指向，且项目根无 settings.json
 repo = HERE / "out" / "_verify_repo"
 if repo.exists():
     shutil.rmtree(repo)
 make_fake_repo(repo)
 
-os.environ.pop("REPO_LENS_SETTINGS", None)
+os.environ.pop("REPO_LUCENT_SETTINGS", None)
 cfg_default = _setup(fake_args(repo))
 ok_1a = cfg_default.max_plugins_in_ai_context == 60
 ok_1b = cfg_default.max_tree_depth == 2
@@ -69,7 +69,7 @@ settings_file.write_text(json.dumps({
     "max_tree_depth": 3,
     "mcp_enabled": False,
 }), encoding="utf-8")
-os.environ["REPO_LENS_SETTINGS"] = str(settings_file)
+os.environ["REPO_LUCENT_SETTINGS"] = str(settings_file)
 
 cfg_injected = _setup(fake_args(repo))
 ok_2a = cfg_injected.max_plugins_in_ai_context == 10      # 源码未改，仅配置生效
@@ -89,24 +89,24 @@ record("cli_args_override_settings", ok_2d,
 # 密钥隔离：settings 含明文密钥，get_secret 必须忽略 settings，只读环境变量
 secret_settings = HERE / "out" / "_verify_secret_settings.json"
 secret_settings.write_text(json.dumps({
-    "REPO_LENS_TEST_KEY": "settings_plaintext_SHOULD_BE_IGNORED",
+    "REPO_LUCENT_TEST_KEY": "settings_plaintext_SHOULD_BE_IGNORED",
     "test_key": "leaked",
 }), encoding="utf-8")
-os.environ["REPO_LENS_SETTINGS"] = str(secret_settings)
-os.environ["REPO_LENS_TEST_KEY"] = "env_value_123"
+os.environ["REPO_LUCENT_SETTINGS"] = str(secret_settings)
+os.environ["REPO_LUCENT_TEST_KEY"] = "env_value_123"
 
 # 子用例 3a：环境变量存在时，get_secret 读 env（settings 被忽略）
-v_env = get_secret("REPO_LENS_TEST_KEY")
+v_env = get_secret("REPO_LUCENT_TEST_KEY")
 ok_3a = v_env == "env_value_123"
 record("secret_reads_env", ok_3a,
-       f"get_secret(REPO_LENS_TEST_KEY)={v_env!r} (期望 'env_value_123'，settings 明文被忽略)")
+       f"get_secret(REPO_LUCENT_TEST_KEY)={v_env!r} (期望 'env_value_123'，settings 明文被忽略)")
 
 # 子用例 3b：环境变量缺失时，get_secret 仍为 None（证明从不读 settings.json）
-os.environ.pop("REPO_LENS_TEST_KEY", None)
-v_none = get_secret("REPO_LENS_TEST_KEY")
+os.environ.pop("REPO_LUCENT_TEST_KEY", None)
+v_none = get_secret("REPO_LUCENT_TEST_KEY")
 ok_3b = v_none is None
 record("secret_never_reads_settings", ok_3b,
-       f"env 缺失时 get_secret(REPO_LENS_TEST_KEY)={v_none!r} (期望 None；settings 内的明文不被读取)")
+       f"env 缺失时 get_secret(REPO_LUCENT_TEST_KEY)={v_none!r} (期望 None；settings 内的明文不被读取)")
 
 # ---------------------------------------------------------------- render 集成 ----
 # 注入的 max_plugins 真正裁剪 AI 上下文插件表行数
@@ -126,14 +126,14 @@ data = {
 }
 row_re = re.compile(r"^\| .+ \| .+ \| .+ \| \d+ \|$")
 # 默认注入（无 settings）→ 60，应保留全部 15 行
-os.environ.pop("REPO_LENS_SETTINGS", None)
+os.environ.pop("REPO_LUCENT_SETTINGS", None)
 cfg_d = _setup(fake_args(repo))
 out_d = render_ai_context(data, cfg_d.max_plugins_in_ai_context)
 rows_d = sum(1 for ln in out_d.splitlines() if row_re.match(ln))
 ok_rd = rows_d == 15
 
 # 注入 10 → 应只保留 10 行（裁剪生效）
-os.environ["REPO_LENS_SETTINGS"] = str(settings_file)
+os.environ["REPO_LUCENT_SETTINGS"] = str(settings_file)
 cfg_i = _setup(fake_args(repo))
 out_i = render_ai_context(data, cfg_i.max_plugins_in_ai_context)
 rows_i = sum(1 for ln in out_i.splitlines() if row_re.match(ln))
@@ -143,7 +143,7 @@ record("render_respects_injected_limit", ok_rd and ok_ri,
 
 # ---------------------------------------------------------------- 汇总 ----
 fails = [r for r in RESULTS if not r["ok"]]
-os.environ.pop("REPO_LENS_SETTINGS", None)  # 还原环境
+os.environ.pop("REPO_LUCENT_SETTINGS", None)  # 还原环境
 shutil.rmtree(repo, ignore_errors=True)
 for f in (settings_file, secret_settings):
     try:

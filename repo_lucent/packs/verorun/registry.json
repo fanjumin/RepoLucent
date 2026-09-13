@@ -1,0 +1,164 @@
+{
+  "pack": "verorun",
+  "pack_version": "1.0",
+  "title": "VeroRun 业务探针",
+  "desc": "对接真实业务环境的**只读**探针：应用商店 HTTP 门控探针 / 服务器只读 SSH 巡检。",
+  "scripts": [
+    {
+      "id": "store_probe",
+      "name": "VeroRun 应用商店 只读/越界门控 真实环境探针",
+      "category": "testing",
+      "kind": "tool",
+      "status": "active",
+      "version": "1.0.0",
+      "summary": "对给定商店后端执行一组【只读 + 鉴权越界门控】用例（就绪/公开浏览最小权限/登录浏览/详情裁剪/兼容判定/无token写端点403/404/输入加固），逐条 PASS/FAIL 并支持 --json。凭证只从环境变量取，不做任何真实变更。",
+      "entry": "repo_lucent.packs.verorun.store_probe",
+      "inputs": [
+        {
+          "name": "--base-url",
+          "type": "url",
+          "required": false,
+          "default": "https://agent.easykai.cn",
+          "desc": "商店后端基址"
+        },
+        {
+          "name": "--prefix",
+          "type": "string",
+          "required": false,
+          "default": "/admin/plugins",
+          "desc": "插件 API 前缀"
+        },
+        {
+          "name": "--token-env",
+          "type": "string",
+          "required": false,
+          "default": "builtin",
+          "desc": "存放 JWT 的环境变量名；缺省时尝试用 VR_STORE_USER/PASS 自动登录"
+        },
+        {
+          "name": "--timeout",
+          "type": "int",
+          "required": false,
+          "default": 25,
+          "desc": "单请求超时秒"
+        },
+        {
+          "name": "--json",
+          "type": "flag",
+          "required": false,
+          "desc": "输出结构化 JSON"
+        }
+      ],
+      "outputs": {
+        "stdout": "逐条 [PASS/FAIL/SKIP] id desc | detail + 合计",
+        "json": "{base,authenticated,results[]}",
+        "exit": "0 全通过 / 1 有失败 / 2 参数或网络不可达"
+      },
+      "deps": {
+        "stdlib_only": true,
+        "third_party": [],
+        "network": true,
+        "needs_repo": false
+      },
+      "reuses_platform": [],
+      "overlap": "与主命令无重叠；被测对象为运行期商店后端而非静态仓库。",
+      "usage": "repolucent.py script run store_probe --base-url https://<host> [--json]",
+      "notes": "仅 GET 与『无凭证写端点探测(预期403, 不落库)』；凭证走环境变量 VR_STORE_TOKEN 或 VR_STORE_USER/VR_STORE_PASS，绝不入 argv/文件。生产慎用 --base-url 指向正式站。",
+      "tags": [
+        "http",
+        "testing",
+        "store",
+        "security",
+        "gating",
+        "read-only"
+      ],
+      "origin": {
+        "source_path": "C:/Users/Administrator/.qwenworkcn/workspace/mty3em275wj2u0cs/api_probe.py",
+        "source_sha256": "02433bbcfc81249d",
+        "extracted_at": "2026-09-12"
+      },
+      "pack": "verorun"
+    },
+    {
+      "id": "ssh_readonly_probe",
+      "name": "VeroRun 服务器 只读 SSH 探针",
+      "category": "testing",
+      "kind": "tool",
+      "status": "active",
+      "version": "1.0.0",
+      "summary": "经 SSH 采集部署版本/git、商店相关 .env（脱敏）、systemd 服务态、负载与服务器侧 store_catalog 可达性；内置破坏性命令拒绝名单，仅执行只读命令，可 --cmd 追加单条只读命令。",
+      "entry": "repo_lucent.packs.verorun.ssh_readonly_probe",
+      "inputs": [
+        {
+          "name": "--host",
+          "type": "string",
+          "required": true,
+          "desc": "目标主机 IP/域名"
+        },
+        {
+          "name": "--port",
+          "type": "int",
+          "required": false,
+          "default": 22,
+          "desc": "SSH 端口"
+        },
+        {
+          "name": "--repo",
+          "type": "path",
+          "required": false,
+          "default": "/home/guxiao/verorun",
+          "desc": "部署仓库路径"
+        },
+        {
+          "name": "--cmd",
+          "type": "string",
+          "required": false,
+          "desc": "追加单条自定义只读命令（受拒绝名单约束）"
+        },
+        {
+          "name": "--timeout",
+          "type": "int",
+          "required": false,
+          "default": 60,
+          "desc": "单命令墙钟超时秒"
+        },
+        {
+          "name": "--json",
+          "type": "flag",
+          "required": false,
+          "desc": "输出结构化 JSON"
+        }
+      ],
+      "outputs": {
+        "stdout": "逐条命令 $ 回显 + 超时/退出码 + 结论",
+        "json": "{host,degraded,rows[]}",
+        "exit": "0 正常 / 1 检出超时或非零退出(降级) / 2 环境错(缺 paramiko/凭证/连接失败) / 3 内部异常"
+      },
+      "deps": {
+        "stdlib_only": false,
+        "third_party": [
+          "paramiko"
+        ],
+        "network": true,
+        "needs_repo": false
+      },
+      "reuses_platform": [],
+      "overlap": "与 store_probe 互补：一个走 HTTP 外部面，一个走服务器内部面；均只读。",
+      "usage": "repolucent.py script run ssh_readonly_probe --host <ip> --repo <path>  （先 export VR_SSH_USER VR_SSH_PASS）",
+      "notes": "paramiko 惰性导入，未装时 script doctor 仍通过、仅 run 返回 2。凭证仅环境变量，拒绝 rm/mkfs/dd/>/systemctl stop|restart/git push 等破坏性 token。",
+      "tags": [
+        "ssh",
+        "testing",
+        "ops",
+        "read-only",
+        "paramiko"
+      ],
+      "origin": {
+        "source_path": "C:/Users/Administrator/.qwenworkcn/workspace/mty3em275wj2u0cs/ssh_probe.py",
+        "source_sha256": "93663c11148bf805",
+        "extracted_at": "2026-09-12"
+      },
+      "pack": "verorun"
+    }
+  ]
+}

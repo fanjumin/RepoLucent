@@ -12,7 +12,7 @@ from types import SimpleNamespace
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
-from repo_lens.cli import (_setup, _build_argparser, _analyze,
+from repo_lucent.cli import (_setup, _build_argparser, _analyze,
                             invalidate_analysis_cache)
 
 results = []

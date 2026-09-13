@@ -40,8 +40,8 @@ os.environ.setdefault("PYTHONUNBUFFERED", "1")
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
-from repo_lens.scriptlib.adapters import ADAPTERS, dispatch            # noqa: E402
-from repo_lens.scriptlib.adapters.base import normalize_exit_code      # noqa: E402
+from repo_lucent.scriptlib.adapters import ADAPTERS, dispatch            # noqa: E402
+from repo_lucent.scriptlib.adapters.base import normalize_exit_code      # noqa: E402
 
 RESULTS: list[dict] = []
 PY = sys.executable
@@ -103,7 +103,7 @@ def case_binary() -> None:
     check("binary_in_contract_exit_preserved", r5.exit_code == 1, f"exit={r5.exit_code}")
 
     # 未能启动 → 环境错
-    r6 = dispatch({"kind": "binary", "command": "__repolens_no_such_binary__"}, [])
+    r6 = dispatch({"kind": "binary", "command": "__repolucent_no_such_binary__"}, [])
     check("binary_spawn_failure_is_env_error",
           r6.exit_code == 2 and r6.error == "spawn_failed",
           f"exit={r6.exit_code} error={r6.error}")
@@ -135,7 +135,7 @@ def case_python_pkg() -> None:
     ok = all(e == 2 and err == "adapter_error" for _, e, err in bad)
     check("python_pkg_illegal_module_rejected", ok, f"results={bad}")
 
-    r2 = dispatch({"kind": "python_pkg", "module": "__repolens_absent_pkg__"}, [])
+    r2 = dispatch({"kind": "python_pkg", "module": "__repolucent_absent_pkg__"}, [])
     check("python_pkg_missing_package_actionable",
           r2.exit_code == 2 and r2.error == "package_missing"
           and "pip install" in (r2.hint or ""),
@@ -157,7 +157,7 @@ def case_exit_codes() -> None:
     check("normalize_exit_code_table", ok, f"got={got}")
 
     # 端到端：借 sys.modules 注入探针模块，走真实 builtin 通道
-    name = "repo_lens.scriptlib._verify_exit_probe"
+    name = "repo_lucent.scriptlib._verify_exit_probe"
 
     def _probe(code):
         mod = types.ModuleType(name)
@@ -182,14 +182,14 @@ def case_exit_codes() -> None:
 # ------------------------------------------------------------------ 14) 门控现状 ----
 
 def case_gate_posture() -> None:
-    from repo_lens.script_cmd import run_script_api
+    from repo_lucent.script_cmd import run_script_api
 
     out = []
     for kind, spec in (("binary", {"command": PY}),
                        ("python_pkg", {"module": "json.tool"})):
         s = {"id": "_verify_probe", "kind": kind, "status": "active", **spec}
         # 借 _index 覆盖：直接调用 run_script_api 需注册表命中，故改用等价门控判定
-        from repo_lens import script_cmd as SC
+        from repo_lucent import script_cmd as SC
         orig = SC._index
         SC._index = lambda reg, _s=s: {_s["id"]: _s}
         try:

@@ -43,8 +43,8 @@ os.environ.setdefault("PYTHONUNBUFFERED", "1")
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
-from repo_lens.llm.providers import openai_compat as OC              # noqa: E402
-from repo_lens.llm.providers.base import ChatResult, Provider, ToolCall  # noqa: E402
+from repo_lucent.llm.providers import openai_compat as OC              # noqa: E402
+from repo_lucent.llm.providers.base import ChatResult, Provider, ToolCall  # noqa: E402
 
 RESULTS: list[dict] = []
 
@@ -295,12 +295,12 @@ def case_base_fallback() -> None:
 # --------------------------------------------- 13~14) runner 接线与用量累计 ----
 
 def case_runner_wiring(cfg, data, dims, provider, **kw):
-    from repo_lens.llm import runner as LR
+    from repo_lucent.llm import runner as LR
     return LR.run_semantic_audit(cfg, data, dims, provider=provider,
                                  use_tools=False, **kw)
 
 def case_runner_usage() -> None:
-    from repo_lens.cli import _analyze, _build_argparser, _setup
+    from repo_lucent.cli import _analyze, _build_argparser, _setup
 
     out_dir = HERE / "out"
     out_dir.mkdir(parents=True, exist_ok=True)

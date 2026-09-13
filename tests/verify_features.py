@@ -28,8 +28,8 @@ os.environ.setdefault("PYTHONUNBUFFERED", "1")
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
-from repo_lens import cli  # noqa: E402
-from repo_lens.server import _Handler, ThreadingHTTPServer  # noqa: E402
+from repo_lucent import cli  # noqa: E402
+from repo_lucent.server import _Handler, ThreadingHTTPServer  # noqa: E402
 
 PORT = 8805
 RESULTS = []
@@ -92,7 +92,7 @@ def main() -> int:
     proj_settings = HERE / "settings.json"   # 项目级 settings.json = 工具根（与 /api/settings/llm 一致）
     try:
         # ---- 1) repo_registry 模块往返 ----
-        from repo_lens import repo_registry as RR
+        from repo_lucent import repo_registry as RR
         ent = RR.add_repo(TMP_NAME, str(repo), None)
         ok_res = RR.resolve(TMP_NAME) is not None
         dup_rejected = False
@@ -151,14 +151,14 @@ def main() -> int:
                          {"llm_enabled": True, "default_model": "qwen-plus",
                           "models": [{"name": "qwen-plus", "provider": "openai_compat",
                                       "model": "qwen-plus",
-                                      "key_env": "REPO_LENS_DASHSCOPE_KEY"}],
+                                      "key_env": "REPO_LUCENT_DASHSCOPE_KEY"}],
                           "confirm": False})
         ok_dry5 = st == 200 and d.get("dry_run") is True
         st, _ct, d = req("POST", "/api/settings/llm",
                          {"llm_enabled": True, "default_model": "qwen-plus",
                           "models": [{"name": "qwen-plus", "provider": "openai_compat",
                                       "model": "qwen-plus",
-                                      "key_env": "REPO_LENS_DASHSCOPE_KEY"}],
+                                      "key_env": "REPO_LUCENT_DASHSCOPE_KEY"}],
                           "confirm": True})
         written = proj_settings.is_file() and d.get("ok") is True
         bak = proj_settings.with_suffix(".json.bak")
@@ -166,7 +166,7 @@ def main() -> int:
         on_disk = json.loads(proj_settings.read_text(encoding="utf-8")) if written else {}
         ok_llm = (on_disk.get("llm_enabled") is True
                   and (on_disk.get("models") or [{}])[0].get("key_env")
-                  == "REPO_LENS_DASHSCOPE_KEY"
+                  == "REPO_LUCENT_DASHSCOPE_KEY"
                   and "sk-" not in proj_settings.read_text(encoding="utf-8"))
         # 零删除还原：覆写回原内容（无原文件则覆写为 {}）；.bak 只检不删
         restore = orig if orig is not None else "{}\n"
@@ -178,7 +178,7 @@ def main() -> int:
                f"dry={ok_dry5} written={written} bak={bak_ok} disk_ok={ok_llm} env_status={env_ok}")
 
         # ---- 6) 报告模板：过滤/重排/回退 ----
-        from repo_lens.report_md import apply_md_template
+        from repo_lucent.report_md import apply_md_template
         md = ("# T\n> head\n## 1. A\nsec1\n## 2. B\nsec2\n## 3. C\nsec3\n---\n*sign*\n")
         t_none = apply_md_template(md, None) == md and apply_md_template(md, []) == md
         t_re = apply_md_template(md, ["core", "overview"])
@@ -189,7 +189,7 @@ def main() -> int:
                f"noop={t_none} reorder={t_ok} fallback={t_fb}")
 
         # ---- 7) ssh_tool 只读守卫 ----
-        from repo_lens.scriptlib.ssh_tool import check_readonly
+        from repo_lucent.scriptlib.ssh_tool import check_readonly
         guard = (check_readonly("rm -rf /x") and check_readonly("systemctl restart nginx")
                  and check_readonly("echo x >> /etc/passwd") and check_readonly("git push origin m"))
         allow = (check_readonly("uname -a") is None and check_readonly("df -h") is None

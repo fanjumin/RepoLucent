@@ -20,8 +20,8 @@ os.environ.setdefault("PYTHONUNBUFFERED", "1")
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
-from repo_lens import cli  # noqa: E402
-from repo_lens.server import _Handler, ThreadingHTTPServer  # noqa: E402
+from repo_lucent import cli  # noqa: E402
+from repo_lucent.server import _Handler, ThreadingHTTPServer  # noqa: E402
 
 def _make_args(repo, out):
     a = types.SimpleNamespace()

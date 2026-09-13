@@ -30,8 +30,8 @@ os.environ.setdefault("PYTHONUNBUFFERED", "1")
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
-from repo_lens import cli  # noqa: E402
-from repo_lens.server import _Handler, ThreadingHTTPServer  # noqa: E402
+from repo_lucent import cli  # noqa: E402
+from repo_lucent.server import _Handler, ThreadingHTTPServer  # noqa: E402
 
 PORT = 8803
 RESULTS = []
@@ -100,8 +100,8 @@ def main() -> int:
             "llm_key": "sk-plaintext-SHOULD_MASK",
             "llm_enabled": False, "mcp_servers": [],
         }), encoding="utf-8")
-        old = os.environ.get("REPO_LENS_SETTINGS")
-        os.environ["REPO_LENS_SETTINGS"] = str(sec_file)
+        old = os.environ.get("REPO_LUCENT_SETTINGS")
+        os.environ["REPO_LUCENT_SETTINGS"] = str(sec_file)
         try:
             st, _ct, d = req("GET", "/api/settings")
             ok1 = (st == 200 and d.get("profile_name") == "verorun"
@@ -111,9 +111,9 @@ def main() -> int:
                    f"status={st} profile_name={d.get('profile_name')} masked={d['config'].get('llm_key')!r}")
         finally:
             if old is None:
-                os.environ.pop("REPO_LENS_SETTINGS", None)
+                os.environ.pop("REPO_LUCENT_SETTINGS", None)
             else:
-                os.environ["REPO_LENS_SETTINGS"] = old
+                os.environ["REPO_LUCENT_SETTINGS"] = old
 
         # ---- 2) 组管理往返 ----
         st, _ct, d = req("POST", "/api/git/groups/add",
@@ -198,7 +198,7 @@ def main() -> int:
         srv.server_close()
         # 清理测试残留的临时空组（不污染用户级 groups.json）
         try:
-            from repo_lens.packs.gitflow.repo_group import load_groups, save_groups
+            from repo_lucent.packs.gitflow.repo_group import load_groups, save_groups
             gs = load_groups()
             if TMP_GROUP in gs and not gs[TMP_GROUP].repos:
                 gs.pop(TMP_GROUP)

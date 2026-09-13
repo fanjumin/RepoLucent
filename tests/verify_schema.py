@@ -12,7 +12,7 @@
   8) 本地 $ref 定义生效（plugins.items[0] 缺必填 → 报错路径精确到下标）
   9) 数组元素类型错误被抓（overview.by_language[0].code 改成字符串）
  10) bool 不被当作 integer（Python 里 bool 是 int 子类，必须显式排除）
- 11) CLI 入口：python -m repo_lens.schema_check rc=0（合法）/ rc=1（不合法）
+ 11) CLI 入口：python -m repo_lucent.schema_check rc=0（合法）/ rc=1（不合法）
 
 启动方式：python verify_schema.py
 退出码 0=全 PASS；1=有 FAIL。结果另存 out/schema_verify.json。
@@ -32,9 +32,9 @@ os.environ.setdefault("PYTHONUNBUFFERED", "1")
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
-from repo_lens import cli                                     # noqa: E402
-from repo_lens.config import RepoConfig                       # noqa: E402
-from repo_lens.schema_check import (load_schema, validate,    # noqa: E402
+from repo_lucent import cli                                     # noqa: E402
+from repo_lucent.config import RepoConfig                       # noqa: E402
+from repo_lucent.schema_check import (load_schema, validate,    # noqa: E402
                                     validate_report, SCHEMA_PATH)
 
 RESULTS: list[dict] = []
@@ -50,7 +50,7 @@ def _report(repo: Path, out: Path) -> dict:
                                module=None, plugin=None)
     data, _dur, pc = cli._analyze(ns, cfg)
     cli._write_reports(cfg, data, "json,symbols", parse_cache=pc)
-    return json.loads((cfg.out_dir / "repo_lens.json").read_text(encoding="utf-8"))
+    return json.loads((cfg.out_dir / "repo_lucent.json").read_text(encoding="utf-8"))
 
 def _has(errs: list[str], needle: str) -> bool:
     return any(needle in e for e in errs)
@@ -147,10 +147,10 @@ def main() -> int:
     bad_p = tmp / "bad.json"
     bad_p.write_text(json.dumps(bad, ensure_ascii=False), encoding="utf-8")
     env = dict(os.environ, PYTHONPATH=str(HERE))
-    r_good = subprocess.run([sys.executable, "-m", "repo_lens.schema_check",
+    r_good = subprocess.run([sys.executable, "-m", "repo_lucent.schema_check",
                              str(good_p)], capture_output=True, text=True,
                             env=env, cwd=str(HERE), timeout=120)
-    r_bad = subprocess.run([sys.executable, "-m", "repo_lens.schema_check",
+    r_bad = subprocess.run([sys.executable, "-m", "repo_lucent.schema_check",
                             str(bad_p)], capture_output=True, text=True,
                            env=env, cwd=str(HERE), timeout=120)
     check("cli_entry_rc_semantics",

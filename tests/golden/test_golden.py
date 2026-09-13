@@ -4,7 +4,7 @@
 定位（对标 Google Tricorder 的 golden 思路）
 --------------------------------------------
 产物契约的**持续性**验证。单元层只覆盖 `py_ast` / `cache` 这类纯函数，
-集成层（`verify_*.py`）只断言若干字段；而 `repo_lens.json` / 报告 / AGENTS.md
+集成层（`verify_*.py`）只断言若干字段；而 `repo_lucent.json` / 报告 / AGENTS.md
 的真实形态一旦变化（字段增删、排序变动、文案改动），只有逐字节对比能发现。
 
 更新流程
@@ -27,11 +27,11 @@ import pytest
 #: 刻意在本文件内重复声明而非从 conftest 导入——parametrize 需要收集期常量，
 #: 且避免依赖 conftest 的模块导入路径（该行为受 pytest import mode 影响）。
 GOLDEN_ARTIFACTS = (
-    "repo_lens.json",
-    "repo_lens_report.md",
+    "repo_lucent.json",
+    "repo_lucent_report.md",
     "AI_CONTEXT.md",
     "AGENTS.md",
-    "repo_lens_symbols.json",
+    "repo_lucent_symbols.json",
 )
 
 pytestmark = pytest.mark.golden
@@ -82,7 +82,7 @@ def test_all_golden_artifacts_present(golden_output):
 def test_deterministic_strips_volatile_fields(golden_output):
     """确定性模式必须剥离易变字段，否则快照无法稳定。"""
     import json
-    meta = json.loads((golden_output / "repo_lens.json").read_bytes())["meta"]
+    meta = json.loads((golden_output / "repo_lucent.json").read_bytes())["meta"]
     assert meta["generated_at"] is None
     assert meta["duration_ms"] is None
     assert "/" not in meta["repo_root"] and "\\" not in meta["repo_root"]

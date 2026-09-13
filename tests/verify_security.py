@@ -10,12 +10,12 @@
   6) POST Origin: http://127.0.0.1:port + token → 200
   7) GET / 首页含注入 token 且页面 200
   8) /mcp（HTTP）无 token → 401；带 token initialize → 200
-  9) REPOLENS_TOKEN 环境变量固定         → 用该值访问 200
+  9) REPOLUCENT_TOKEN 环境变量固定         → 用该值访问 200
  10) /static/ 目录穿越                    → 仍被拦截（403/400）
  11) 路由回归：/api/scripts（精确）与 /api/scripts/<id>（前缀兜底）都可达
  12) 路由回归：未知路径 → 404；/api/report 未生成 → 404
  13) 豁免面回归：/static/tokens.css 免 token 可达
- 14) X-RepoLens-Token 与 Authorization: Bearer 两种凭据通道都有效
+ 14) X-RepoLucent-Token 与 Authorization: Bearer 两种凭据通道都有效
 
 启动方式：python verify_security.py   （自起 127.0.0.1 随机端口服务，自测自停）
 退出码 0=全 PASS；1=有 FAIL。
@@ -36,8 +36,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
-from repo_lens import server as SR           # noqa: E402
-from repo_lens.config import RepoConfig      # noqa: E402
+from repo_lucent import server as SR           # noqa: E402
+from repo_lucent.config import RepoConfig      # noqa: E402
 
 results = []
 
@@ -51,7 +51,7 @@ def _free_port() -> int:
         return s.getsockname()[1]
 
 def _req(method, path, token=None, host_header=None, origin=None,
-         body=None, base=None, token_header="X-RepoLens-Token"):
+         body=None, base=None, token_header="X-RepoLucent-Token"):
     """发一个真实 HTTP 请求，返回 (status, headers, body_bytes)。"""
     url = base + path
     data = None
@@ -112,7 +112,7 @@ class _Srv:
 def main() -> int:
     port = _free_port()
     base = f"http://127.0.0.1:{port}"
-    os.environ.pop("REPOLENS_TOKEN", None)
+    os.environ.pop("REPOLUCENT_TOKEN", None)
     token, degraded = SR.resolve_auth_token()
     check("token_generated", bool(token) and not degraded,
           f"len={len(token)} degraded={degraded}")
@@ -158,7 +158,7 @@ def main() -> int:
         st, _, b = _req("GET", "/", base=base)
         page = b.decode("utf-8", errors="replace")
         check("index_200_with_token",
-              st == 200 and token in page and "__REPOLENS_TOKEN__" not in page,
+              st == 200 and token in page and "__REPOLUCENT_TOKEN__" not in page,
               f"status={st} injected={token in page}")
 
         # 8) /mcp：无 token 401；带 token initialize 200
@@ -202,9 +202,9 @@ def main() -> int:
     finally:
         srv.stop()
 
-    # 9) REPOLENS_TOKEN 环境变量固定
+    # 9) REPOLUCENT_TOKEN 环境变量固定
     fixed = "fixed-token-for-env-test-abc123"
-    os.environ["REPOLENS_TOKEN"] = fixed
+    os.environ["REPOLUCENT_TOKEN"] = fixed
     try:
         t2, deg2 = SR.resolve_auth_token()
         check("env_token_fixed", t2 == fixed and not deg2)
@@ -219,15 +219,15 @@ def main() -> int:
         finally:
             srv2.stop()
     finally:
-        os.environ.pop("REPOLENS_TOKEN", None)
+        os.environ.pop("REPOLUCENT_TOKEN", None)
 
-    # 降级模式：REPOLENS_TOKEN="" → 无鉴权（自担风险，显式选择）
-    os.environ["REPOLENS_TOKEN"] = ""
+    # 降级模式：REPOLUCENT_TOKEN="" → 无鉴权（自担风险，显式选择）
+    os.environ["REPOLUCENT_TOKEN"] = ""
     try:
         t3, deg3 = SR.resolve_auth_token()
         check("degrade_mode_explicit", t3 == "" and deg3)
     finally:
-        os.environ.pop("REPOLENS_TOKEN", None)
+        os.environ.pop("REPOLUCENT_TOKEN", None)
 
     fails = [r for r in results if not r["ok"]]
     print("\n" + ("—— 安全矩阵全部通过 ——" if not fails

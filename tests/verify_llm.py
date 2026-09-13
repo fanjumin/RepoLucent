@@ -8,7 +8,7 @@
 4. 只加严不放行（LLM-2）：语义发现 severity=blocking 时，
    semantic_can_block=False → 不增加 blocking；=True → 才纳入
 5. 工具回环复用 MCP（§3.2-2）：假 provider 发起工具调用 → 真实启动
-   `python -m repo_lens mcp` 子进程执行 repo.summary，走同一 tools/call
+   `python -m repo_lucent mcp` 子进程执行 repo.summary，走同一 tools/call
 6. 熔断与密钥脱敏（LLM-1/LLM-3）：不可达网关 → 重试后降级；repr 不含明文密钥
 """
 from __future__ import annotations
@@ -32,15 +32,15 @@ def _write_settings(d: Path, obj: dict) -> str:
 def main() -> int:
     results: list[dict] = []
 
-    from repo_lens.cli import _setup, _build_argparser
-    from repo_lens.llm import runner as LR
-    from repo_lens.llm.providers.base import ChatResult, Provider, ToolCall
-    from repo_lens.llm.providers.openai_compat import OpenAICompat
-    from repo_lens.settings import load_settings
+    from repo_lucent.cli import _setup, _build_argparser
+    from repo_lucent.llm import runner as LR
+    from repo_lucent.llm.providers.base import ChatResult, Provider, ToolCall
+    from repo_lucent.llm.providers.openai_compat import OpenAICompat
+    from repo_lucent.settings import load_settings
 
     # ---------------- 用例 1：无模型配置 → 降级 ----------------
     with tempfile.TemporaryDirectory() as td:
-        os.environ["REPO_LENS_SETTINGS"] = _write_settings(
+        os.environ["REPO_LUCENT_SETTINGS"] = _write_settings(
             Path(td), {"llm_enabled": False, "models": []})
         load_settings()  # 触发重读
         run = LR.run_semantic_audit(None, None, None)
@@ -51,22 +51,22 @@ def main() -> int:
     # ---------------- 用例 2：有模型但缺密钥 → 降级 ----------------
     try:
         with tempfile.TemporaryDirectory() as td:
-            os.environ.pop("REPO_LENS_TEST_LLM_KEY", None)
-            os.environ.pop("REPO_LENS_TEST_LLM_BASE", None)
-            os.environ["REPO_LENS_SETTINGS"] = _write_settings(Path(td), {
+            os.environ.pop("REPO_LUCENT_TEST_LLM_KEY", None)
+            os.environ.pop("REPO_LUCENT_TEST_LLM_BASE", None)
+            os.environ["REPO_LUCENT_SETTINGS"] = _write_settings(Path(td), {
                 "llm_enabled": True,
                 "models": [{"name": "test", "provider": "openai_compat",
                             "model": "qwen-test",
-                            "key_env": "REPO_LENS_TEST_LLM_KEY",
-                            "base_url_env": "REPO_LENS_TEST_LLM_BASE"}],
+                            "key_env": "REPO_LUCENT_TEST_LLM_KEY",
+                            "base_url_env": "REPO_LUCENT_TEST_LLM_BASE"}],
             })
             run = LR.run_semantic_audit(None, None, None)
-            ok2 = ((not run.ran) and "REPO_LENS_TEST_LLM_KEY" in (run.reason or "")
+            ok2 = ((not run.ran) and "REPO_LUCENT_TEST_LLM_KEY" in (run.reason or "")
                    and "环境变量" in (run.reason or ""))
             results.append({"case": "degrade_missing_key_env", "ok": ok2,
                             "detail": {"ran": run.ran, "reason": run.reason}})
     finally:
-        os.environ.pop("REPO_LENS_SETTINGS", None)
+        os.environ.pop("REPO_LUCENT_SETTINGS", None)
 
     # ---------------- 准备真实 cfg / data（用例 3、4、5 共用）----------------
     out_dir = HERE / "out"
@@ -74,11 +74,11 @@ def main() -> int:
     args = _build_argparser().parse_args(
         ["audit", "--repo", str(REPO_DEFAULT), "--out", str(out_dir)])
     cfg = _setup(args)
-    from repo_lens.cli import _analyze
+    from repo_lucent.cli import _analyze
     import types as _t
     ns = _t.SimpleNamespace(no_cache=False, deterministic=False)
     data, _dur, _pc = _analyze(ns, cfg)
-    from repo_lens.audit import engine as AE
+    from repo_lucent.audit import engine as AE
     dims = list(AE.DEFAULT_DIMS)
 
     # ---------------- 用例 3：假 provider 合法 JSON → 回灌 findings ----------------
@@ -98,7 +98,7 @@ def main() -> int:
 
     good_json = json.dumps({"findings": [
         {"rule_id": "AIB004", "dimension": "ai_business", "severity": "blocking",
-         "title": "测试语义发现", "file": "repo_lens/demo.py", "line": 12,
+         "title": "测试语义发现", "file": "repo_lucent/demo.py", "line": 12,
          "why": "测试证据", "confidence": "high", "fix": "测试修复"},
         {"rule_id": "NOPE999", "file": "x.py", "why": "未知规则应被拒"},
     ]}, ensure_ascii=False)
@@ -139,7 +139,7 @@ def main() -> int:
     ok5 = False
     detail5: dict = {}
     try:
-        from repo_lens.llm.loopback import McpLoopback
+        from repo_lucent.llm.loopback import McpLoopback
         lb = McpLoopback(cfg.repo_root, cfg.out_dir)
         lb.start()
         try:

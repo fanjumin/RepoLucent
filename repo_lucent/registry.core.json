@@ -1,0 +1,734 @@
+{
+  "registry_version": 1.1,
+  "meta_schema": {
+    "version": "1.0",
+    "compat": "MAJOR=删/改字段类型或语义(须同步 script_cmd 与文档); MINOR=仅增可选字段(消费方忽略未识别字段)"
+  },
+  "categories": [
+    "analysis",
+    "verification",
+    "testing",
+    "git-workflow",
+    "reporting",
+    "ops",
+    "data",
+    "util"
+  ],
+  "status_enum": [
+    "active",
+    "planned",
+    "deprecated",
+    "archived"
+  ],
+  "scripts": [
+    {
+      "id": "dangerous_api_scan",
+      "name": "危险 API / 调用模式静态扫描",
+      "category": "analysis",
+      "kind": "tool",
+      "status": "active",
+      "version": "1.0.0",
+      "summary": "扫描仓库中『取原始资源的变量被危险方法直接调用且未经包装』的模式；规则数据化、可 --rules 注入适配任意框架。退出码 0/1 可作 CI 红线。",
+      "entry": "repo_lucent.scriptlib.dangerous_api_scan",
+      "inputs": [
+        {
+          "name": "--root",
+          "type": "path",
+          "required": false,
+          "default": ".",
+          "desc": "扫描根目录"
+        },
+        {
+          "name": "--rules",
+          "type": "file",
+          "required": false,
+          "default": "builtin",
+          "desc": "外部规则 JSON（缺省用内置 raw_db_conn_execute 等）"
+        },
+        {
+          "name": "--json",
+          "type": "flag",
+          "required": false,
+          "desc": "结构化输出"
+        },
+        {
+          "name": "--fail-on-hit",
+          "type": "flag",
+          "required": false,
+          "desc": "命中即退出码 1（CI 语义显式化）"
+        }
+      ],
+      "outputs": {
+        "stdout": "命中清单 [rule] file:line: snippet",
+        "json": "{root,count,hits[]}",
+        "exit": "0 无命中 / 1 有命中 / 2 参数错"
+      },
+      "deps": {
+        "stdlib_only": true,
+        "third_party": [],
+        "network": false,
+        "needs_repo": false
+      },
+      "reuses_platform": [
+        "repo_lucent.config.DEFAULT_EXCLUDE_DIRS"
+      ],
+      "overlap": "与 gate.py 既有门禁互补（gate 管体量/结构，本脚本管跨行调用链误用）",
+      "usage": "repolucent.py script run dangerous_api_scan --root <repo> --fail-on-hit",
+      "notes": "内置规则针对数据库裸连接；适配其它框架请提供 --rules JSON。只读，不改源文件。",
+      "tags": [
+        "ast-like",
+        "regex",
+        "ci",
+        "lint"
+      ],
+      "origin": {
+        "source_path": "C:/Users/Administrator/.qwenworkcn/workspace/mtvjkbolno04xf4s/outputs/verification/scan_raw_conn_misuse.py",
+        "source_sha256": "5c0e367defc2f200",
+        "extracted_at": "2026-09-12"
+      }
+    },
+    {
+      "id": "anchor_assert",
+      "name": "改动锚点断言器",
+      "category": "verification",
+      "kind": "tool",
+      "status": "active",
+      "version": "1.0.0",
+      "summary": "把报告/补丁示例引用的改动锚点外置成 claims.json，逐条对真实仓库断言『文件存在且期望原文子串仍在（可选行号）』。任一条 FAIL 即说明文档会打歪。纯只读。",
+      "entry": "repo_lucent.scriptlib.anchor_assert",
+      "inputs": [
+        {
+          "name": "--against",
+          "type": "path",
+          "required": true,
+          "desc": "目标仓库根目录"
+        },
+        {
+          "name": "--claims",
+          "type": "file",
+          "required": true,
+          "desc": "锚点清单 JSON 数组：[{id,file,must_contain,line?,note?}]"
+        },
+        {
+          "name": "--json",
+          "type": "flag",
+          "required": false,
+          "desc": "结构化输出"
+        },
+        {
+          "name": "--stop-on-first",
+          "type": "flag",
+          "required": false,
+          "desc": "遇首个 FAIL 即停"
+        }
+      ],
+      "outputs": {
+        "stdout": "逐条 [PASS/FAIL] id file — reason",
+        "json": "{repo,total,fail,results[]}",
+        "exit": "0 全PASS / 1 有FAIL / 2 参数错"
+      },
+      "deps": {
+        "stdlib_only": true,
+        "third_party": [],
+        "network": false,
+        "needs_repo": false
+      },
+      "reuses_platform": [],
+      "overlap": "",
+      "usage": "repolucent.py script run anchor_assert --against <repo> --claims claims.json",
+      "notes": "把『读真实文件→断言锚点→打补丁』方法论工具化；claims 由报告生成器产出，勿硬编码进脚本。",
+      "tags": [
+        "verification",
+        "docs",
+        "audit"
+      ],
+      "origin": {
+        "source_path": "C:/Users/Administrator/.qwenworkcn/workspace/mtwrnvpl2scozvdp/verify/anchors.py",
+        "source_sha256": "1587e5976c18b801",
+        "extracted_at": "2026-09-12"
+      }
+    },
+    {
+      "id": "sloc_summary",
+      "name": "轻量代码量速查",
+      "category": "analysis",
+      "kind": "tool",
+      "status": "active",
+      "version": "1.0.0",
+      "summary": "cloc 风格 code/comment/blank 按语言+顶层目录统计，面向任意目录速查。",
+      "entry": "repo_lucent.scriptlib.sloc_summary",
+      "inputs": [
+        {
+          "name": "--root",
+          "type": "path",
+          "required": false,
+          "default": ".",
+          "desc": "统计根目录"
+        },
+        {
+          "name": "--top",
+          "type": "int",
+          "required": false,
+          "default": "15",
+          "desc": "模块榜单条数"
+        },
+        {
+          "name": "--json",
+          "type": "flag",
+          "required": false,
+          "desc": "仅结构化输出"
+        },
+        {
+          "name": "--out",
+          "type": "file",
+          "required": false,
+          "desc": "把 JSON 结果写入文件"
+        }
+      ],
+      "outputs": {
+        "stdout": "按语言/按顶层目录双维榜单",
+        "json": "{by_language,by_module,total_*}",
+        "exit": "0 成功 / 2 参数错"
+      },
+      "deps": {
+        "stdlib_only": true,
+        "third_party": [],
+        "network": false,
+        "needs_repo": false
+      },
+      "reuses_platform": [
+        "repo_lucent.config.DEFAULT_EXCLUDE_DIRS"
+      ],
+      "overlap": "与 repo_lucent 既有 overview LOC 口径不同（那是 VeroRun 全仓+本地脚本排除）；本脚本为通用速查，勿与主命令混用。",
+      "usage": "repolucent.py script run sloc_summary --root <dir> [--json]",
+      "notes": "语言注释语法表内置；未知扩展名跳过；只读。",
+      "tags": [
+        "sloc",
+        "cloc",
+        "metrics"
+      ],
+      "origin": {
+        "source_path": "C:/Users/Administrator/.qwenworkcn/workspace/mthwrvt2p917d3hz/sloc.py",
+        "source_sha256": "c23a662bbf28f1f6",
+        "extracted_at": "2026-09-12"
+      }
+    },
+    {
+      "id": "git_churn",
+      "name": "Git 增量归因",
+      "category": "git-workflow",
+      "kind": "tool",
+      "status": "active",
+      "version": "1.0.0",
+      "summary": "git numstat 按时间窗/目录/插件/文件净增归因，定位代码膨胀源（合并 bloat_analysis + bloat_recent）。",
+      "entry": "repo_lucent.scriptlib.git_churn",
+      "inputs": [
+        {
+          "name": "--repo",
+          "type": "path",
+          "required": false,
+          "default": ".",
+          "desc": "目标 git 仓库根"
+        },
+        {
+          "name": "--since",
+          "type": "str",
+          "required": false,
+          "default": "30.days",
+          "desc": "时间窗，如 30.days/90.days/180.days"
+        },
+        {
+          "name": "--group-by",
+          "type": "enum",
+          "required": false,
+          "default": "dir",
+          "desc": "dir|plugin|file 聚合维度"
+        },
+        {
+          "name": "--top",
+          "type": "int",
+          "required": false,
+          "default": "15",
+          "desc": "榜单条数"
+        },
+        {
+          "name": "--json",
+          "type": "flag",
+          "required": false,
+          "desc": "结构化输出"
+        }
+      ],
+      "outputs": {
+        "stdout": "窗口净增合计 + 按组 Top + 净增 Top 文件",
+        "json": "{repo,since,ref,added,deleted,net,by_group[],top_files[]}",
+        "exit": "0 成功 / 2 非git仓或无git"
+      },
+      "deps": {
+        "stdlib_only": false,
+        "third_party": [
+          "git(可执行)"
+        ],
+        "network": false,
+        "needs_repo": true
+      },
+      "reuses_platform": [
+        "repo_lucent.config.DEFAULT_EXCLUDE_DIRS"
+      ],
+      "overlap": "与 hotspot_analyzer / git_log_analyzer 部分重叠；本脚本聚焦『净增行数归因』。",
+      "usage": "repolucent.py script run git_churn --repo <r> --since 90.days --group-by plugin",
+      "notes": "历史不足时间窗时取最早点近似并提示；只读，不改仓库。",
+      "tags": [
+        "git",
+        "numstat",
+        "churn",
+        "bloat"
+      ],
+      "origin": {
+        "source_path": "F:/共享文件夹/RepoLucent/tests/bloat_analysis.py + bloat_recent.py",
+        "source_sha256": "231738e05cad5d40 / 8121a447119bee88",
+        "extracted_at": "2026-09-12"
+      }
+    },
+    {
+      "id": "offline_db_stub",
+      "name": "离线数据库替身桩",
+      "category": "testing",
+      "kind": "harness",
+      "status": "active",
+      "version": "1.0.0",
+      "summary": "表无关的内存 SQL 语义替身 + install_stub 边界 monkeypatch；不连真库跑离线单测。CLI 仅跑内置自检。",
+      "entry": "repo_lucent.scriptlib.offline_db_stub",
+      "inputs": [
+        {
+          "name": "--self-test",
+          "type": "flag",
+          "required": false,
+          "desc": "运行内置自检测试（无参时默认执行）"
+        }
+      ],
+      "outputs": {
+        "stdout": "自检逐条 PASS/FAIL",
+        "import": "FakeDB / SimpleTable / install_stub / FakeCursor",
+        "exit": "0 自检通过 / 1 失败"
+      },
+      "deps": {
+        "stdlib_only": true,
+        "third_party": [],
+        "network": false,
+        "needs_repo": false
+      },
+      "reuses_platform": [],
+      "overlap": "",
+      "usage": "from repo_lucent.scriptlib.offline_db_stub import FakeDB, SimpleTable, install_stub  # 被测代码以 `with _db() as conn` 为契约",
+      "notes": "只实现被测代码用到的 SQL 子集（按归一化前缀分派）；未知语句抛 AssertionError 以便暴露缺口。原桩硬绑 chatbot，本桩泛化。",
+      "tags": [
+        "test",
+        "stub",
+        "monkeypatch",
+        "offline"
+      ],
+      "origin": {
+        "source_path": "C:/Users/Administrator/.qwenworkcn/workspace/mtwrnvpl2scozvdp/outputs/AI-Advisor-patch-set/plugins/chatbot/tests/_stubs.py",
+        "source_sha256": "be0bf743c690e350",
+        "extracted_at": "2026-09-12"
+      }
+    },
+    {
+      "id": "subprocess_harness",
+      "name": "子进程往返协议验证模板",
+      "category": "testing",
+      "kind": "harness",
+      "status": "active",
+      "version": "1.0.0",
+      "summary": "对 stdio JSON-RPC 子进程按『用例(方法+期望谓词)』跑往返；内置自给自足 demo 验证 initialize/tools/未知方法/通知不挂起。",
+      "entry": "repo_lucent.scriptlib.subprocess_harness",
+      "inputs": [
+        {
+          "name": "--demo",
+          "type": "flag",
+          "required": false,
+          "desc": "运行内置最小 JSON-RPC 往返自检（无参时默认执行）"
+        }
+      ],
+      "outputs": {
+        "stdout": "逐用例 PASS/FAIL",
+        "import": "JsonRpcProc / roundtrip / has_result / has_error / expect_field",
+        "exit": "0 全通过 / 1 有失败 / 2 参数错"
+      },
+      "deps": {
+        "stdlib_only": true,
+        "third_party": [],
+        "network": false,
+        "needs_repo": false
+      },
+      "reuses_platform": [],
+      "overlap": "",
+      "usage": "from repo_lucent.scriptlib.subprocess_harness import JsonRpcProc, roundtrip  # 换成本项目的 server 启动命令与用例即可",
+      "notes": "Windows 下 PYTHONPATH 用 os.pathsep 拼接；read 按 id 匹配、跳过通知，防挂起。原脚本硬绑 mcp_server+numpy，本模板参数化。",
+      "tags": [
+        "test",
+        "jsonrpc",
+        "subprocess",
+        "harness"
+      ],
+      "origin": {
+        "source_path": "C:/Users/Administrator/.qwenworkcn/workspace/mtjmjntr5od7ygsn/verify_sa/test_mcp_roundtrip.py",
+        "source_sha256": "1ebe8226f7a5a895",
+        "extracted_at": "2026-09-12"
+      }
+    },
+    {
+      "id": "script_sweep",
+      "name": "脚本普查器（发现候选）",
+      "category": "analysis",
+      "kind": "tool",
+      "status": "active",
+      "version": "1.0.0",
+      "summary": "扫描目录内 .py，去噪后按四维打分给出『值得提炼入库』的候选并标注是否已登记；脚本资产库的发现入口，dogfooding 自身。",
+      "entry": "repo_lucent.scriptlib.script_sweep",
+      "inputs": [
+        {
+          "name": "root",
+          "type": "path",
+          "required": false,
+          "default": ".",
+          "desc": "被扫描目录（位置参数）"
+        },
+        {
+          "name": "--min-score",
+          "type": "int",
+          "required": false,
+          "default": "6",
+          "desc": "展示分数阈值"
+        },
+        {
+          "name": "--limit",
+          "type": "int",
+          "required": false,
+          "default": "40",
+          "desc": "最多条数"
+        },
+        {
+          "name": "--json",
+          "type": "flag",
+          "required": false,
+          "desc": "结构化输出"
+        }
+      ],
+      "outputs": {
+        "stdout": "候选榜单（★=已入库）",
+        "json": "{root,scanned,shown,candidates[]}",
+        "exit": "0 成功 / 2 参数错"
+      },
+      "deps": {
+        "stdlib_only": true,
+        "third_party": [],
+        "network": false,
+        "needs_repo": false
+      },
+      "reuses_platform": [],
+      "overlap": "",
+      "usage": "repolucent.py script sweep <目录> [--min-score 6] [--json]",
+      "notes": "分数仅客观初筛，是否入库由人工定 Tier；对被扫目录严格只读。",
+      "tags": [
+        "meta",
+        "discovery",
+        "sweep",
+        "ast"
+      ],
+      "origin": {
+        "source_path": "RepoLucent/script_sweep_prototypes/{inventory.py,score.py}",
+        "source_sha256": null,
+        "extracted_at": "2026-09-12"
+      }
+    },
+    {
+      "id": "copy_patchset",
+      "name": "补丁集搬运+清单",
+      "category": "ops",
+      "kind": "tool",
+      "status": "archived",
+      "version": "0.0.0",
+      "summary": "把 worktree 指定文件复制到交付目录并生成 MANIFEST(行数+sha256)。绑定特定文件清单，一次性。",
+      "entry": null,
+      "notes": "archived：不入库运行；如需请 script sweep 重新提炼。搬运逻辑可借鉴。",
+      "origin": {
+        "source_path": "C:/Users/Administrator/.qwenworkcn/workspace/mtwrnvpl2scozvdp/verify/copy_patchset.py",
+        "source_sha256": "d1948adb56460843",
+        "extracted_at": "2026-09-12"
+      }
+    },
+    {
+      "id": "attribution",
+      "name": "LOC 来源裁表（一次性）",
+      "category": "analysis",
+      "kind": "tool",
+      "status": "archived",
+      "version": "0.0.0",
+      "summary": "读工具产出的 repo_lucent.json 按语言/目录解释行数来源，绑本次审计 JSON。",
+      "entry": null,
+      "origin": {
+        "source_path": "F:/共享文件夹/RepoLucent/tests/attribution.py",
+        "source_sha256": "7068dc14465c2a34",
+        "extracted_at": "2026-09-12"
+      }
+    },
+    {
+      "id": "market_calendar",
+      "name": "A股交易日历（跨域）",
+      "category": "util",
+      "kind": "tool",
+      "status": "archived",
+      "version": "0.0.0",
+      "summary": "离线 CSV 优先+周末兜底的交易日历库模块。通用但属行情业务域，与代码分析工具跑题，不入库。",
+      "entry": null,
+      "origin": {
+        "source_path": "C:/Users/Administrator/.qwenworkcn/workspace/mtl3w1swg4pzphs3/verify_impl/scratch/calendar_mod/market_calendar.py",
+        "source_sha256": "c0208e7958ce7bee",
+        "extracted_at": "2026-09-12"
+      }
+    },
+    {
+      "id": "ssh_tool",
+      "name": "通用 SSH 工具（默认只读约束）",
+      "category": "ops",
+      "kind": "tool",
+      "status": "active",
+      "version": "1.0.0",
+      "summary": "对任意主机执行调用方给定的命令清单：默认受破坏性 token 拒绝名单约束（只读），--yes-i-know 显式解锁写操作；凭证仅环境变量（REPO_LUCENT_SSH_* 兼容旧 VR_SSH_*），支持私钥文件；输出逐命令 stdout/stderr/退出码/耗时，可 --json。",
+      "entry": "repo_lucent.scriptlib.ssh_tool",
+      "inputs": [
+        {
+          "name": "--host",
+          "type": "string",
+          "required": true,
+          "desc": "目标主机 IP/域名"
+        },
+        {
+          "name": "--port",
+          "type": "int",
+          "required": false,
+          "default": 22,
+          "desc": "SSH 端口"
+        },
+        {
+          "name": "--user",
+          "type": "string",
+          "required": false,
+          "desc": "SSH 用户（缺省取 REPO_LUCENT_SSH_USER/VR_SSH_USER）"
+        },
+        {
+          "name": "--cmd",
+          "type": "string",
+          "required": true,
+          "desc": "要执行的命令（可重复传入多条；默认受只读名单约束）"
+        },
+        {
+          "name": "--key",
+          "type": "path",
+          "required": false,
+          "desc": "私钥文件路径（缺省密码认证）"
+        },
+        {
+          "name": "--timeout",
+          "type": "int",
+          "required": false,
+          "default": 60,
+          "desc": "单命令墙钟超时秒"
+        },
+        {
+          "name": "--yes-i-know",
+          "type": "flag",
+          "required": false,
+          "desc": "解锁破坏性名单（写操作由调用方负责）"
+        },
+        {
+          "name": "--json",
+          "type": "flag",
+          "required": false,
+          "desc": "输出结构化 JSON"
+        }
+      ],
+      "outputs": {
+        "stdout": "逐条命令 $ 回显 + stderr + 退出码/耗时 + 拒绝清单",
+        "json": "{host,port,user,rows[],rejected[],degraded}",
+        "exit": "0 全部成功 / 1 有失败或被拒 / 2 环境错(缺 paramiko/凭证/连接失败) / 3 内部异常"
+      },
+      "deps": {
+        "stdlib_only": false,
+        "third_party": [
+          "paramiko"
+        ],
+        "network": true,
+        "needs_repo": false
+      },
+      "reuses_platform": [],
+      "overlap": "与 ssh_readonly_probe 互补：probe 固定采集 VeroRun 部署面；本工具由调用方给命令，通用面。",
+      "usage": "repolucent.py script run ssh_tool --host <ip> --cmd \"uname -a\" --cmd \"df -h\" --json  （先 export REPO_LUCENT_SSH_USER/REPO_LUCENT_SSH_PASS）",
+      "notes": "paramiko 惰性导入；拒绝名单含 rm/mkfs/dd/>>/systemctl stop|restart/kill/chmod/chown/mv/git push 等；--yes-i-know 仅越过名单，UI/MCP 通道 confirm 门控仍独立生效。",
+      "tags": [
+        "ssh",
+        "ops",
+        "generic",
+        "read-only-guard",
+        "paramiko"
+      ]
+    }
+  ],
+  "audit_rules": [
+    {
+      "rule_id": "ARC001",
+      "dimension": "architecture",
+      "severity": "blocking",
+      "provider": "gate",
+      "detector": "gate:manifest-invalid",
+      "coverage": "rule_only",
+      "title": "插件 manifest 校验失败"
+    },
+    {
+      "rule_id": "ARC002",
+      "dimension": "architecture",
+      "severity": "blocking",
+      "provider": "gate",
+      "detector": "gate:boundary-violation",
+      "coverage": "rule_only",
+      "title": "核心跨层 import 插件"
+    },
+    {
+      "rule_id": "ARC003",
+      "dimension": "architecture",
+      "severity": "major",
+      "provider": "gate",
+      "detector": "gate:plugin-cycle",
+      "coverage": "rule_only",
+      "title": "插件循环依赖"
+    },
+    {
+      "rule_id": "ARC004",
+      "dimension": "architecture",
+      "severity": "major",
+      "provider": "gate",
+      "detector": "gate:route-unprefixed",
+      "coverage": "rule_only",
+      "title": "路由未加 /admin/<id> 前缀"
+    },
+    {
+      "rule_id": "ARC005",
+      "dimension": "architecture",
+      "severity": "major",
+      "provider": "ci",
+      "detector": "ci_analyzer",
+      "coverage": "rule_only",
+      "title": "CI/CD 配置合规（CI00x 映射）"
+    },
+    {
+      "rule_id": "QLT001",
+      "dimension": "quality",
+      "severity": "minor",
+      "provider": "gate",
+      "detector": "gate:file-too-large",
+      "coverage": "rule_only",
+      "title": "单文件超代码行阈值"
+    },
+    {
+      "rule_id": "SEC001",
+      "dimension": "security",
+      "severity": "major",
+      "provider": "scanner",
+      "detector": "audit.providers.scanners",
+      "coverage": "rule_only",
+      "title": "源码硬编码明文凭据"
+    },
+    {
+      "rule_id": "SEC005",
+      "dimension": "security",
+      "severity": "blocking",
+      "provider": "scanner",
+      "detector": "audit.providers.scanners",
+      "coverage": "rule_only",
+      "title": "疑似 SQL 注入（拼接进 execute）"
+    },
+    {
+      "rule_id": "SEC002",
+      "dimension": "security",
+      "severity": "major",
+      "provider": "scanner",
+      "detector": "audit.providers.rulepack:regex_line",
+      "coverage": "rule_only",
+      "title": "SSRF：外部URL请求缺主机白名单守卫"
+    },
+    {
+      "rule_id": "SEC003",
+      "dimension": "security",
+      "severity": "major",
+      "provider": "scanner",
+      "detector": "audit.providers.rulepack:regex_line",
+      "coverage": "rule_only",
+      "title": "鉴权 fail-open：密钥为空时静默放行"
+    },
+    {
+      "rule_id": "QLT002",
+      "dimension": "quality",
+      "severity": "minor",
+      "provider": "scanner",
+      "detector": "audit.providers.rulepack:ast:bare_except",
+      "coverage": "rule_only",
+      "title": "吞异常：except 仅 pass"
+    },
+    {
+      "rule_id": "QLT003",
+      "dimension": "quality",
+      "severity": "minor",
+      "provider": "scanner",
+      "detector": "audit.providers.rulepack:ast:long_function",
+      "coverage": "rule_only",
+      "title": "超长函数（≥80 行）"
+    },
+    {
+      "rule_id": "QLT004",
+      "dimension": "quality",
+      "severity": "info",
+      "provider": "scanner",
+      "detector": "audit.providers.rulepack:ast:unused_imports",
+      "coverage": "rule_only",
+      "title": "未使用的顶层 import"
+    },
+    {
+      "rule_id": "AIB001",
+      "dimension": "ai_business",
+      "severity": "major",
+      "provider": "scanner",
+      "detector": "audit.providers.rulepack:ast:except_return_fallback",
+      "coverage": "rule_only",
+      "title": "兜底吞真因：except 返回常量且未记录异常"
+    },
+    {
+      "rule_id": "AIB002",
+      "dimension": "ai_business",
+      "severity": "major",
+      "provider": "semantic",
+      "detector": null,
+      "coverage": "semantic",
+      "title": "配置多源不同步（需语义层，阶段4；当前仅登记不判定）"
+    },
+    {
+      "rule_id": "AIB004",
+      "dimension": "ai_business",
+      "severity": "major",
+      "provider": "semantic",
+      "detector": null,
+      "coverage": "semantic",
+      "title": "转人工/关键词规则未落到生效通道（需语义层）"
+    },
+    {
+      "rule_id": "SEC004",
+      "dimension": "security",
+      "severity": "major",
+      "provider": "semantic",
+      "detector": null,
+      "coverage": "semantic",
+      "title": "敏感端点缺鉴权/越权校验（需语义层，阶段4可回灌判定）"
+    }
+  ],
+  "_note": "pack 分层（v1.8.0）：本文件只登记**内核通用**脚本资产。场景化的写能力/业务探针由 repo_lucent/packs/<name>/registry.json 贡献，运行时按 settings.packs.enabled（缺省按 profile）聚合。"
+}

@@ -43,13 +43,13 @@ def run_cli(repo: Path, out: Path, *extra: str) -> subprocess.CompletedProcess:
     """以子进程执行 CLI（与 ``_run_regress.py`` 同口径，避免进程内状态串扰）。
 
     ``--no-date-dir`` 恒开：让产物直接落在 ``out``，便于按固定路径断言。
-    ``REPOLENS_SETTINGS`` 一律剔除，避免外部环境变量把本机配置带进测试。
+    ``REPOLUCENT_SETTINGS`` 一律剔除，避免外部环境变量把本机配置带进测试。
     """
     env = dict(os.environ)
     env["PYTHONPATH"] = str(PROJECT_ROOT)
-    env.pop("REPOLENS_SETTINGS", None)
+    env.pop("REPOLUCENT_SETTINGS", None)
     return subprocess.run(
-        [sys.executable, "-m", "repo_lens", "--repo", str(repo),
+        [sys.executable, "-m", "repo_lucent", "--repo", str(repo),
          "--out", str(out), "--no-date-dir", *extra],
         capture_output=True, text=True, env=env, cwd=str(PROJECT_ROOT))
 

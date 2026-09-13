@@ -4,7 +4,7 @@
 覆盖：
   1) /            → 200，且是 V1 壳层骨架（.scr / #sider / #smain / 引用 /static/*）
   2) /static/tokens.css / icons.js / app.js → 200 且内容正确
-  3) 目录穿越防护：/static/../../repo_lens/server.py 与 URL 编码变体 → 403/404，绝不返回源码
+  3) 目录穿越防护：/static/../../repo_lucent/server.py 与 URL 编码变体 → 403/404，绝不返回源码
   4) 不存在的静态资源 → 404
   5) JS 语法检查（node --check，若环境有 node）
 """
@@ -25,8 +25,8 @@ os.environ.setdefault("PYTHONUNBUFFERED", "1")
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
-from repo_lens import cli  # noqa: E402
-from repo_lens.server import _Handler, ThreadingHTTPServer, UI_STATIC_DIR  # noqa: E402
+from repo_lucent import cli  # noqa: E402
+from repo_lucent.server import _Handler, ThreadingHTTPServer, UI_STATIC_DIR  # noqa: E402
 
 PORT = 8801
 
@@ -115,9 +115,9 @@ def main() -> int:
             results.append((f"static_{name}", st == 200 and needle in body))
 
         # 3) 目录穿越防护（原始 + URL 编码两种）
-        st, body = get_raw("/static/../../repo_lens/server.py")
+        st, body = get_raw("/static/../../repo_lucent/server.py")
         results.append(("traversal_plain_blocked", st in (403, 404) and "ThreadingHTTPServer" not in body))
-        st, body = get_raw("/static/%2e%2e%2f%2e%2e%2frepo_lens%2fserver.py")
+        st, body = get_raw("/static/%2e%2e%2f%2e%2e%2frepo_lucent%2fserver.py")
         results.append(("traversal_encoded_blocked", st in (403, 404) and "ThreadingHTTPServer" not in body))
 
         # 4) 不存在资源

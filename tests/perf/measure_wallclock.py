@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """完整墙钟压测（阶段四 2a，零产品改动）。
 
-对 REPOLENS_REAL_REPO 指向的真实仓做冷/热两遍全流水线计时：
+对 REPOLUCENT_REAL_REPO 指向的真实仓做冷/热两遍全流水线计时：
   - 冷：--no-cache（禁用 AST + hotspot 增量缓存，全新分析，隔离目录）
   - 热：复用预热写入的同一 cache_dir（hotspot HEAD 短路 / 祖先增量合并生效）
 
@@ -13,7 +13,7 @@
 （写入缓存，不计时），再于隔离目录测冷（--no-cache），最后回同一目录测热（缓存已暖）。
 冷/热各用独立 out_dir 会令 cache_dir 也不同，热跑吃不到冷缓存 → 得出错误结论。
 
-未设置 REPOLENS_REAL_REPO → 打印指引并以 0 退出（CI skip）。
+未设置 REPOLUCENT_REAL_REPO → 打印指引并以 0 退出（CI skip）。
 全程只读分析 + 写临时 out，不改动仓库（cache_dir 随 --out 落在临时目录）。
 """
 import json
@@ -28,7 +28,7 @@ sys.path.insert(0, str(HERE))
 
 
 def _analyze_full(repo: str, out_dir: Path, no_cache: bool) -> dict:
-    from repo_lens.cli import (_build_argparser, _setup, _analyze, _write_reports)
+    from repo_lucent.cli import (_build_argparser, _setup, _analyze, _write_reports)
     argv = ["--repo", str(repo), "--out", str(out_dir)]
     if no_cache:
         argv.append("--no-cache")
@@ -53,9 +53,9 @@ def _analyze_full(repo: str, out_dir: Path, no_cache: bool) -> dict:
 
 
 def main() -> int:
-    repo = os.environ.get("REPOLENS_REAL_REPO")
+    repo = os.environ.get("REPOLUCENT_REAL_REPO")
     if not (repo and Path(repo).is_dir()):
-        print("[wallclock] SKIPPED: 未设置 REPOLENS_REAL_REPO "
+        print("[wallclock] SKIPPED: 未设置 REPOLUCENT_REAL_REPO "
               "（设为真实仓根后重跑即执行冷/热墙钟压测）")
         return 0
 

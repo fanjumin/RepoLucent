@@ -6,7 +6,7 @@
 - **CI 硬门禁只针对 fixture 仓库**，且阈值刻意宽松（数量级门），
   目的是拦住「灾难性退化」，不追求精细卡点——共享盘 / 网络盘上的
   绝对耗时抖动可达数倍，精细阈值必然误报。
-- **真实仓库指标不进 CI**：仅在设置 ``REPOLENS_PERF_REPO`` 时采集并打印，
+- **真实仓库指标不进 CI**：仅在设置 ``REPOLUCENT_PERF_REPO`` 时采集并打印，
   供人工记录进 CHANGELOG。
 
 另外固化两条**结构性**门禁（不依赖机器性能，因此绝对稳定）：
@@ -21,14 +21,14 @@ import re
 
 import pytest
 
-from repo_lens.py_ast import PARALLEL_MIN_FILES, parse_files_parallel
+from repo_lucent.py_ast import PARALLEL_MIN_FILES, parse_files_parallel
 
 pytestmark = pytest.mark.perf
 
 #: fixture 级别宽松上限：正常 < 6s，超过 5 倍即视为灾难性退化。
 FIXTURE_BUDGET_MS = 30_000
 
-PERF_REPO_ENV = "REPOLENS_PERF_REPO"
+PERF_REPO_ENV = "REPOLUCENT_PERF_REPO"
 
 
 def _summary(text: str) -> dict:
@@ -43,7 +43,7 @@ def _summary(text: str) -> dict:
 
 def test_small_batch_never_starts_process_pool(monkeypatch, tmp_path):
     """结构性门禁：小批量必须走串行，绝不因「优化」给自身加进程启动开销。"""
-    import repo_lens.py_ast as A
+    import repo_lucent.py_ast as A
 
     class _Boom:
         def __init__(self, *a, **k):
@@ -63,7 +63,7 @@ def test_small_batch_never_starts_process_pool(monkeypatch, tmp_path):
 
 def test_workers_one_is_serial(monkeypatch, tmp_path):
     """workers=1 是兼容开关：即使批量很大也必须串行。"""
-    import repo_lens.py_ast as A
+    import repo_lucent.py_ast as A
 
     class _Boom:
         def __init__(self, *a, **k):
@@ -120,7 +120,7 @@ def test_real_repo_metrics_are_reported():
     """真实仓库指标采集（不进 CI 硬门禁，仅供人工记录进 CHANGELOG）。
 
     运行方式：
-        set REPOLENS_PERF_REPO=F:\\Sites\\VeroRun
+        set REPOLUCENT_PERF_REPO=F:\\Sites\\VeroRun
         pytest tests/perf -s
     """
     from pathlib import Path
@@ -132,8 +132,8 @@ def test_real_repo_metrics_are_reported():
     env = dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[2]))
     for tag in ("cold", "hot"):
         r = subprocess.run(
-            [sys.executable, "-m", "repo_lens", "--repo", str(repo),
-             "--out", str(Path(os.environ.get("TEMP", "/tmp")) / "repolens_perf"),
+            [sys.executable, "-m", "repo_lucent", "--repo", str(repo),
+             "--out", str(Path(os.environ.get("TEMP", "/tmp")) / "repolucent_perf"),
              "--no-date-dir", "--summary-only"],
             capture_output=True, text=True, env=env)
         s = _summary(r.stdout)

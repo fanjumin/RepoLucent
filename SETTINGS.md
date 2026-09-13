@@ -5,8 +5,8 @@
 ## 1. 设计原则
 
 1. **向后兼容（最高优先）**：无 `settings.json` 时，行为与旧版完全一致。
-2. **优先级链（低 → 高）**：包内默认 < 用户级 `~/.repolucent/settings.json` < 项目级 `<tool>/settings.json` < 环境变量 `REPO_LENS_SETTINGS` 指向的文件。
-3. **密钥隔离**：`api_key` / `base_url` 等敏感项**只**从环境变量 `REPO_LENS_*` 读取；`settings.json` 只承载非敏感配置。
+2. **优先级链（低 → 高）**：包内默认 < 用户级 `~/.repolucent/settings.json` < 项目级 `<tool>/settings.json` < 环境变量 `REPO_LUCENT_SETTINGS` 指向的文件。
+3. **密钥隔离**：`api_key` / `base_url` 等敏感项**只**从环境变量 `REPO_LUCENT_*` 读取；`settings.json` 只承载非敏感配置。
 4. **兼容契约**：`settings` 字段均为可选、MINOR 级；消费方忽略未知字段（沿用 `__init__.py` 的 `SCHEMA_VERSION`）。
 5. **零第三方依赖**：仅标准库（`json` / `os` / `pathlib`）。
 
@@ -17,9 +17,9 @@
 | 优先级 | 路径 | 说明 |
 |---|---|---|
 | 1（最低） | `<pkg>/settings.default.json` | 随包发布的内置默认，作为兜底 |
-| 2 | `~/.repolens/settings.json`（旧 `~/.repolucent/` 兼容回落） | 用户级全局配置 |
+| 2 | `~/.repolucent/settings.json`（旧 `~/.repolucent/` 兼容回落） | 用户级全局配置 |
 | 3 | `<tool 项目根>/settings.json` | 项目级配置 |
-| 4（最高） | `REPO_LENS_SETTINGS` 环境变量指向的文件 | 显式指定，CI/容器常用 |
+| 4（最高） | `REPO_LUCENT_SETTINGS` 环境变量指向的文件 | 显式指定，CI/容器常用 |
 
 任一文件缺失或 JSON 损坏都会被静默忽略（降级为更低的优先级 / 空 dict），不影响工具运行。
 
@@ -41,7 +41,7 @@
 | `analysis.max_file_lines` | int | `2000` | 规则 CMP001 单文件代码行上限（v2.0.0，阶段 F）；CLI `--max-file-lines` 覆盖 |
 | `analysis.max_func_lines` | int | `120` | 规则 CMP002 单函数体行数上限（v2.0.0，阶段 F）；`RepoConfig` 默认值 |
 
-> `CLI args > settings.json > 内置默认`。例如 `repolens.py --tree-depth 3` 会覆盖 settings 中的 `max_tree_depth`。
+> `CLI args > settings.json > 内置默认`。例如 `repolucent.py --tree-depth 3` 会覆盖 settings 中的 `max_tree_depth`。
 
 ### 3.1 外部 MCP Server（outbound，EXT-4）
 
@@ -77,16 +77,16 @@
 
 - 未配置任何 server 时，工具清单与改造前完全一致（8 核心 + 活跃脚本），零行为变化。
 - 调用外部工具与 `script.*` 同门控：`confirm=false` 只返回 dry-run 预览，**绝不自动放行**。
-- 出站子进程会带 `REPO_LENS_MCP_CHILD=1` 标记，子进程不再做出站发现 —— 防止
+- 出站子进程会带 `REPO_LUCENT_MCP_CHILD=1` 标记，子进程不再做出站发现 —— 防止
   “发现→派生→再发现”的进程爆炸（server 配置自引用时尤其关键）。
 - 工具发现带进程级可重入守卫，阻断嵌套/互指 server 造成的无限递归。
 
 **CLI 探针**
 
 ```bash
-repolens.py mcp-out servers                       # 列出已配置的外部 Server
-repolens.py mcp-out tools [--server NAME]         # 发现外部工具
-repolens.py mcp-out call <server> <tool> --arg k=v --confirm
+repolucent.py mcp-out servers                       # 列出已配置的外部 Server
+repolucent.py mcp-out tools [--server NAME]         # 发现外部工具
+repolucent.py mcp-out call <server> <tool> --arg k=v --confirm
 ```
 
 ### 3.2 产物按日期归档（output，DONE-15）
@@ -102,7 +102,7 @@ repolens.py mcp-out call <server> <tool> --arg k=v --confirm
 | `date_dir` | `true` | 置 `false` 则产物直接写入 `--out` 目录（归档前行为） |
 | `date_format` | `"%Y-%m-%d"` | `strftime` 格式；非法格式自动回退默认 |
 
-优先级：**CLI `--no-date-dir`（最高，单次关闭） > 环境变量 `REPO_LENS_DATE_DIR=0|1` > `settings.output.date_dir`**。
+优先级：**CLI `--no-date-dir`（最高，单次关闭） > 环境变量 `REPO_LUCENT_DATE_DIR=0|1` > `settings.output.date_dir`**。
 
 关键设计：只有**产物**下沉到日期目录；**AST 缓存（`.insight_cache`）与基线快照（`history/`）留在稳定根**
 （`RepoConfig.stable_out_dir`）。否则每天新建目录会导致每天首次分析退化为全量解析，且基线无法跨日 diff。
@@ -128,7 +128,7 @@ Claude Code / Copilot / Devin）发现，而这会改变 `git status`。因此�
 | `off` | 不生成 | 不需要 |
 
 优先级：**CLI `--agents-md repo\|workspace\|off`（最高） > 环境变量
-`REPO_LENS_AGENTS_MD` > `settings.output.agents_md` > 内置默认 `workspace`**。
+`REPO_LUCENT_AGENTS_MD` > `settings.output.agents_md` > 内置默认 `workspace`**。
 非法值一律回落 `workspace`，不会因配置写错而中断分析。
 
 设计要点：
@@ -136,7 +136,7 @@ Claude Code / Copilot / Devin）发现，而这会改变 `git status`。因此�
 - **幂等**：块内正文不含时间戳 / 耗时 / 绝对路径，同一仓库连跑两次产物逐字节一致，
   因此 `repo` 模式的写入可以进 Git、可在 review 里 diff。
 - **品牌解耦**：标记块**匹配**只用 `:begin auto` / `:end auto` 词形，
-  不绑定 `repolens` 字样——v2.0.0 更名后，旧仓库里既有的块仍能被识别并原地更新。
+  不绑定 `repolucent` 字样——v2.0.0 更名后，旧仓库里既有的块仍能被识别并原地更新。
 - **`--only` 联动**：需要 `--only` 含 `agents` 令牌（默认含）。`--only json` 等旧用法
   不会产生任何 AGENTS.md，行为与升级前一致。
 - **显式提示**：`repo` 模式写仓库根时，启动输出会在 stderr 打印一次提醒
@@ -198,9 +198,9 @@ AST 解析是全量分析中最昂贵的一步，改为进程池并行（阶段�
    故 `script list/run/doctor` 与 MCP 的 `script.*` 工具清单一起收敛。
 
 > 边界说明：pack 的 Python 模块**始终可导入**（导入不产生写副作用），
-> "未启用"只作用于上面两个入口。`repo_lens/registry.core.json` 是内核脚本的
+> "未启用"只作用于上面两个入口。`repo_lucent/registry.core.json` 是内核脚本的
 > 单一事实源；内核脚本的 `entry` 白名单前缀恒为
-> `repo_lens.scriptlib.` / `repo_lens.packs.`（`scriptlib/adapters/base.py`
+> `repo_lucent.scriptlib.` / `repo_lucent.packs.`（`scriptlib/adapters/base.py`
 > 的 `ALLOWED_ENTRY_PREFIXES` 为双源一致性的事实源）。
 >
 > **兼容保证**：内置 `verorun` profile 默认启用全部 pack，故既有用户行为零变化。
@@ -216,8 +216,8 @@ AST 解析是全量分析中最昂贵的一步，改为进程池并行（阶段�
       "name": "qwen-plus",
       "provider": "openai_compat",
       "model": "qwen-plus",
-      "key_env": "REPO_LENS_DASHSCOPE_KEY",
-      "base_url_env": "REPO_LENS_DASHSCOPE_BASE_URL"
+      "key_env": "REPO_LUCENT_DASHSCOPE_KEY",
+      "base_url_env": "REPO_LUCENT_DASHSCOPE_BASE_URL"
     }
   ],
   "default_model": "qwen-plus"
@@ -227,8 +227,8 @@ AST 解析是全量分析中最昂贵的一步，改为进程池并行（阶段�
 对应环境变量（在 shell / 容器 / CI 中注入，**不入库**）：
 
 ```bash
-export REPO_LENS_DASHSCOPE_KEY="sk-xxxx"
-export REPO_LENS_DASHSCOPE_BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1"
+export REPO_LUCENT_DASHSCOPE_KEY="sk-xxxx"
+export REPO_LUCENT_DASHSCOPE_BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1"
 ```
 
 读取通道：`from .settings import get_secret; get_secret(model["key_env"])`。
@@ -303,17 +303,17 @@ export REPO_LENS_DASHSCOPE_BASE_URL="https://dashscope.aliyuncs.com/compatible-m
 
 ### 7.1 多仓库注册表（repos）
 
-注册表存于 `~/.repolens/repos.json`：`[{name, path, profile, added_at}]`。
+注册表存于 `~/.repolucent/repos.json`：`[{name, path, profile, added_at}]`。
 
 ```bash
-repolens.py repos add --name verorun-main --path "F:\Sites\VeroRun" --profile verorun
-repolens.py repos list            # 同时列出可用 profile 预设
-repolens.py repos remove --name verorun-main --confirm
+repolucent.py repos add --name verorun-main --path "F:\Sites\VeroRun" --profile verorun
+repolucent.py repos list            # 同时列出可用 profile 预设
+repolucent.py repos remove --name verorun-main --confirm
 # 任意分析子命令可改用注册项（其 profile 预设同时生效）：
-repolens.py analyze --repo-name verorun-main
+repolucent.py analyze --repo-name verorun-main
 ```
 
-- `profile` 预设解析顺序：`<tool>/profiles/<name>.json` → `~/.repolens/profiles/<name>.json`；`null`/`verorun` = 内置口径。
+- `profile` 预设解析顺序：`<tool>/profiles/<name>.json` → `~/.repolucent/profiles/<name>.json`；`null`/`verorun` = 内置口径。
 - Web：`GET /api/repos`（只读）、`POST /api/repos/{add,remove}`（confirm 门控）、`POST /api/repos/switch`（运行中换仓：重建 cfg + 按仓 profile 覆盖 + 失效 `_AZ_REGISTRY`/`_ANALYSIS_MEMO` + 重发现前端仓；输出目录切至 `out/<name>/`）。
 - UI：设置视图「多仓库管理」区块（注册/切换/移除）。
 

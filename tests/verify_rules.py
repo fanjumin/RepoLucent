@@ -5,7 +5,7 @@
 - 合成 data：触发 spec / arch(数据派生) / cmp001 等数据派生规则。
 - 合成仓库：构造临时 plugins/ 含违规 .py，断言 SEC / ARCH003 / CMP002 的 AST 规则命中。
 - 端到端：fixture 仓库 analyze → data["findings"] 字段存在且结构正确。
-- opt-in 真实仓（REPOLENS_REAL_REPO）：真实 analyze，断言 findings 非空；未设置则 SKIPPED（CI 绿）。
+- opt-in 真实仓（REPOLUCENT_REAL_REPO）：真实 analyze，断言 findings 非空；未设置则 SKIPPED（CI 绿）。
 """
 import json
 import os
@@ -23,8 +23,8 @@ def record(name, ok, detail=""):
     print(f"[{'PASS' if ok else 'FAIL'}] {name} :: {detail}")
 
 def main() -> int:
-    from repo_lens.config import RepoConfig
-    from repo_lens.rules import run_rules
+    from repo_lucent.config import RepoConfig
+    from repo_lucent.rules import run_rules
 
     # ---- 1) run_rules 对空 data / 无 repo 安全 ----
     empty = run_rules({}, None)
@@ -97,7 +97,7 @@ def main() -> int:
            f"hit={sorted(ids2 & expect2)} missing={sorted(expect2 - ids2)}")
 
     # ---- 4) 端到端：fixture 仓库 analyze 含 findings ----
-    from repo_lens.cli import _build_argparser, _setup, _analyze
+    from repo_lucent.cli import _build_argparser, _setup, _analyze
     fixture = HERE / "tests" / "fixture_repo"
     if fixture.is_dir():
         fargs = _build_argparser().parse_args(
@@ -113,7 +113,7 @@ def main() -> int:
         record("rules_e2e_fixture_findings", True, "SKIPPED: fixture_repo 缺失")
 
     # ---- 5) opt-in 真实仓 ----
-    real = os.environ.get("REPOLENS_REAL_REPO")
+    real = os.environ.get("REPOLUCENT_REAL_REPO")
     if real and Path(real).is_dir():
         rargs = _build_argparser().parse_args(
             ["--repo", real, "--out", str(Path(tempfile.mkdtemp(prefix="rl_")))])
@@ -127,7 +127,7 @@ def main() -> int:
                and isinstance(s, dict) and n > 0)
         record("rules_real_repo", ok5, f"summary={s} items={n}")
     else:
-        record("rules_real_repo", True, "SKIPPED: 未设置 REPOLENS_REAL_REPO")
+        record("rules_real_repo", True, "SKIPPED: 未设置 REPOLUCENT_REAL_REPO")
 
     failed = [r["case"] for r in results if not r["ok"]]
     print(f"\nRESULT: {len(results) - len(failed)}/{len(results)} passed"

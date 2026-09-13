@@ -17,8 +17,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
-import repo_lens.mcp.catalog as cat
-from repo_lens import cli
+import repo_lucent.mcp.catalog as cat
+from repo_lucent import cli
 
 def build_cfg(repo: Path, out: Path):
     ap = cli._build_argparser()
