@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+TESTS = ROOT / "tests"
 SUITES = ["verify_security", "verify_agents", "verify_symbols", "verify_schema",
           "verify_settings", "verify_cache", "verify_profile",
           "verify_mcp_cache_hook", "verify_mcp", "verify_mcp_http",
@@ -21,7 +22,7 @@ SUITES = ["verify_security", "verify_agents", "verify_symbols", "verify_schema",
 py = sys.executable
 fails = []
 for name in SUITES:
-    r = subprocess.run([py, str(ROOT / f"{name}.py")],
+    r = subprocess.run([py, str(TESTS / f"{name}.py")],
                        cwd=str(ROOT), capture_output=True, text=True,
                        encoding="utf-8", errors="replace", timeout=560)
     line = f"{name} EXIT={r.returncode}"
