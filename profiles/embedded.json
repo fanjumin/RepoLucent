@@ -1,0 +1,41 @@
+{
+  "profile": {
+    "name": "embedded",
+    "repo_signature": { "dirs": [], "files": [] },
+
+    "component": { "dir": "", "manifest": "" },
+    "core_modules": {},
+    "auto_core_exclude": [],
+    "exclude_dirs": null,
+    "root_entry_allowlist": [],
+    "key_docs": ["README.md", "AGENTS.md", "CHANGELOG.md", "platformio.ini"],
+    "standard_doc_pattern": "",
+    "frontend_repo_names": [],
+
+    "plugin_system": { "enabled": false },
+
+    "report_sections": {
+      "plugin_contract": false,
+      "manifest_fields": false,
+      "interaction_conventions": false,
+      "architecture_redlines": true,
+      "boundary_rule": null,
+      "redlines": [
+        "本口径用于 **C / C++ / Arduino / PlatformIO** 工程；",
+        "依赖图基于 #include 解析（本地引号包含，系统 <...> 不计），为静态启发式，",
+        "不做预处理展开/模板实例化/跨 TU 符号解析；未解析的包含会被丢弃，宁欠连不误连；",
+        ".pio / libdeps 等三方与构建目录默认排除，只分析本仓自有源码。"
+      ]
+    },
+
+    "default_gates": null,
+    "gates": { "rules": ["file-too-large", "include-cycle"], "route_prefix_pattern": null },
+
+    "packs": { "enabled": [] },
+
+    "branding": {
+      "title": "嵌入式 / C-C++ 洞察仪表盘",
+      "artifact_prefix": "repolucent_deep"
+    }
+  }
+}

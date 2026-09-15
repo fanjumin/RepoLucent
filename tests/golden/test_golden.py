@@ -79,6 +79,25 @@ def test_all_golden_artifacts_present(golden_output):
     assert not missing, f"缺少产物：{missing}"
 
 
+def test_artifacts_use_lf_only(golden_output):
+    """DEF-01 回归防线：五件产物一律以 LF 落盘，绝不因平台默认换行在 Windows 变 CRLF。
+
+    产物"逐字节可 diff / 跨机器复现"契约的地基；曾因 JSON 写盘漏 newline="\\n"
+    在 Windows 静默退化为 \\r\\n 而破坏契约，故此处以字节级不变量钉死。
+    """
+    offenders = []
+    for name in GOLDEN_ARTIFACTS:
+        p = golden_output / name
+        if not p.exists():
+            continue
+        raw = p.read_bytes()
+        crlf = raw.count(b"\r\n")
+        if crlf:
+            offenders.append(f"{name}: {crlf} CRLF")
+    assert not offenders, (
+        f"产物含 CRLF，跨平台字节确定性被破坏（写盘须 newline='\\n'）：{offenders}")
+
+
 def test_deterministic_strips_volatile_fields(golden_output):
     """确定性模式必须剥离易变字段，否则快照无法稳定。"""
     import json

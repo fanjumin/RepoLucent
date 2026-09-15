@@ -185,9 +185,9 @@ def test_load_non_dict_entries(tmp_path):
     assert load(tmp_path) == {}
 
 
-def test_cache_version_is_three():
-    """2-B 引入内容寻址，记录结构新增 hash 字段 → CACHE_VERSION 必须为 3。"""
-    assert CACHE_VERSION == 3
+def test_cache_version_is_four():
+    """依赖图在 entry 新增 import_facts / calls 两字段 → CACHE_VERSION 必须为 4。"""
+    assert CACHE_VERSION == 4
 
 
 def test_end_to_end_touch_then_hit(tmp_path):

@@ -13,18 +13,27 @@ from typing import Any
 
 
 def _check_git_available(repo_root: Path) -> bool:
-    """检查目录是否为有效的 git 仓库。"""
+    """检查目录**自身**是否为有效的 git 仓库根（避免向上冒泡误用父仓）。"""
     try:
         result = subprocess.run(
-            ["git", "rev-parse", "--git-dir"],
+            ["git", "rev-parse", "--show-toplevel"],
             cwd=str(repo_root),
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=5,
         )
-        return result.returncode == 0
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         return False
+    if result.returncode != 0:
+        return False
+    top = (result.stdout or "").strip()
+    if not top:
+        return False
+    import os
+    norm = lambda p: os.path.normcase(os.path.normpath(str(p)))
+    return norm(top) == norm(repo_root) or norm(Path(top).resolve()) == norm(repo_root.resolve())
 
 
 def scan_untracked(repo_root: Path, classify: bool = True,

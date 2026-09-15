@@ -12,16 +12,34 @@ from .config import RepoConfig
 from .fs_scan import iter_repo_files, read_text_safe
 from .py_ast import parse_python_file
 
+#: 参与"模块"识别与符号归集的源文件后缀（Python + C/C++/Arduino 两前端）。
+SOURCE_SUFFIXES = config.PARSEABLE_EXTS
+
+
+def _parse_source(fpath, rel: str) -> dict:
+    """按后缀派发解析（缓存命中失败时的兜底路径，须与预热口径一致）。"""
+    suffix = str(rel).rsplit(".", 1)[-1].lower() if "." in str(rel) else ""
+    if "." + suffix in config.CXX_EXTS:
+        from .cxx_ast import parse_cxx_file
+        return parse_cxx_file(fpath, str(rel))
+    return parse_python_file(fpath, str(rel))
+
+
+def _plugin_core_dir() -> str:
+    """插件框架核心目录名（profile.plugin_system.core_dir）；未声明返回空串。"""
+    return str((config.PLUGIN_SYSTEM or {}).get("core_dir") or "")
+
 
 def _pm_key(name: str) -> str:
-    """plugin_manager 下文件的 parse_cache 键。
+    """插件框架目录下文件的 parse_cache 键。
 
     必须与预热（cli.py）及其他分析器严格同构：统一 str(Path(...))。
     历史版本这里硬编码 "plugin_manager/x.py"（POSIX 斜杠），而预热用
     str(Path(...))（Windows 为反斜杠），两者不匹配 → 这些文件每次运行都
     重新解析，且 AST 缓存永不命中。输出字段仍用 POSIX 风格，保持不变。
     """
-    return str(Path("plugin_manager") / name)
+    core_dir = _plugin_core_dir()
+    return str(Path(core_dir) / name) if core_dir else name
 
 
 def _discover_core_dirs(cfg: RepoConfig) -> list[str]:
@@ -36,8 +54,9 @@ def _discover_core_dirs(cfg: RepoConfig) -> list[str]:
             continue
         if p.name in config.AUTO_CORE_EXCLUDE:
             continue
-        has_py = any(True for _ in p.rglob("*.py"))
-        if has_py:
+        has_src = any(f.suffix.lower() in SOURCE_SUFFIXES
+                      for f in p.rglob("*") if f.is_file())
+        if has_src:
             auto.append(p.name)
     known = [k for k in config.KNOWN_CORE_MODULES if (root / k).is_dir()]
     return sorted(set(known) | set(auto))
@@ -51,7 +70,7 @@ def analyze_core(cfg: RepoConfig, parse_cache: dict) -> dict:
     for name in _discover_core_dirs(cfg):
         dir_path = root / name
         py_files = [rel for rel, _ in iter_repo_files(cfg)
-                    if rel.parts[0] == name and rel.suffix == ".py"]
+                    if rel.parts[0] == name and rel.suffix.lower() in SOURCE_SUFFIXES]
 
         classes, funcs, blueprints, routes = [], [], [], []
         import_roots: dict[str, int] = {}
@@ -64,7 +83,7 @@ def analyze_core(cfg: RepoConfig, parse_cache: dict) -> dict:
             pkg_doc = init_entry.get("docstring")
 
         for rel in py_files:
-            entry = parse_cache.get(str(rel)) or parse_python_file(root / rel, str(rel))
+            entry = parse_cache.get(str(rel)) or _parse_source(root / rel, str(rel))
             parse_cache[str(rel)] = entry
             loc_total += entry["loc_total"]
             loc_code += entry["loc_code"]
@@ -90,7 +109,7 @@ def analyze_core(cfg: RepoConfig, parse_cache: dict) -> dict:
 
         modules.append({
             "name": name,
-            "description": config.KNOWN_CORE_MODULES.get(name) or (pkg_doc or "（自动识别的 Python 代码模块）"),
+            "description": config.KNOWN_CORE_MODULES.get(name) or (pkg_doc or "（自动识别的源码模块）"),
             "known": name in config.KNOWN_CORE_MODULES,
             "py_files": len(py_files),
             "loc": loc_total,
@@ -123,7 +142,7 @@ def analyze_core(cfg: RepoConfig, parse_cache: dict) -> dict:
     entry_files = []
     for rel, _ in iter_repo_files(cfg):
         if len(rel.parts) == 1 and rel.suffix == ".py":
-            entry = parse_cache.get(str(rel)) or parse_python_file(root / rel, str(rel))
+            entry = parse_cache.get(str(rel)) or _parse_source(root / rel, str(rel))
             parse_cache[str(rel)] = entry
             entry_files.append({
                 "file": str(rel),
@@ -141,21 +160,42 @@ def analyze_core(cfg: RepoConfig, parse_cache: dict) -> dict:
 
 
 def _analyze_plugin_system(cfg: RepoConfig, parse_cache: dict) -> dict:
-    """聚焦插件框架契约：BasePlugin 接口、PluginManager 公共 API、发现规则、钩子/事件。"""
+    """聚焦插件框架契约：base_class 接口、Manager 公共 API、发现规则、钩子/事件。
+
+    口径全部来自 profile.plugin_system。未启用插件体系（或未声明 core_dir）时
+    返回**同键集的空段**——产物 schema 不随 profile 变化，"是否启用"由配置层
+    （config.plugin_system_enabled()）承载。
+    """
+    empty: dict = {"base_plugin": None, "manager_api": None,
+                   "discovery_rules": [], "support_modules": [], "hooks_events": {}}
+    ps = config.PLUGIN_SYSTEM or {}
+    if not config.plugin_system_enabled():
+        return empty
+    core_dir = str(ps.get("core_dir") or "")
+    if not core_dir:
+        return empty
+
+    files = ps.get("files") or {}
+    base_name = str(files.get("base") or "base.py")
+    manager_name = str(files.get("manager") or "manager.py")
+    discovery_name = str(files.get("discovery") or "discovery.py")
+    base_class = str(ps.get("base_class") or "BasePlugin")
+    manager_pat = str(ps.get("manager_class_pattern") or "Manager")
+
     root = cfg.repo_root
-    pm_dir = root / "plugin_manager"
+    pm_dir = root / core_dir
     out: dict = {"base_plugin": None, "manager_api": None,
                  "discovery_rules": [], "support_modules": [], "hooks_events": {}}
 
-    base_file = pm_dir / "base.py"
+    base_file = pm_dir / base_name
     if base_file.exists():
-        k = _pm_key("base.py")
+        k = _pm_key(base_name)
         entry = parse_cache.get(k) or parse_python_file(base_file, k)
         parse_cache[k] = entry
         for c in entry["classes"]:
-            if c["name"] == "BasePlugin":
+            if c["name"] == base_class:
                 out["base_plugin"] = {
-                    "file": "plugin_manager/base.py",
+                    "file": f"{core_dir}/{base_name}",
                     "docstring": c["docstring"],
                     "methods": [
                         {"name": m["name"], "signature": m["signature"],
@@ -165,16 +205,16 @@ def _analyze_plugin_system(cfg: RepoConfig, parse_cache: dict) -> dict:
                 }
                 break
 
-    manager_file = pm_dir / "manager.py"
+    manager_file = pm_dir / manager_name
     if manager_file.exists():
-        k = _pm_key("manager.py")
+        k = _pm_key(manager_name)
         entry = parse_cache.get(k) or parse_python_file(manager_file, k)
         parse_cache[k] = entry
         for c in entry["classes"]:
-            if "Manager" in c["name"]:
+            if manager_pat in c["name"]:
                 out["manager_api"] = {
                     "class": c["name"],
-                    "file": "plugin_manager/manager.py",
+                    "file": f"{core_dir}/{manager_name}",
                     "methods": [
                         {"name": m["name"], "signature": m["signature"], "docstring": m["docstring"]}
                         for m in c["methods"] if not m["name"].startswith("_")
@@ -182,36 +222,38 @@ def _analyze_plugin_system(cfg: RepoConfig, parse_cache: dict) -> dict:
                 }
                 break
 
-    discovery_file = pm_dir / "discovery.py"
+    discovery_file = pm_dir / discovery_name
     if discovery_file.exists():
-        k = _pm_key("discovery.py")
+        k = _pm_key(discovery_name)
         entry = parse_cache.get(k) or parse_python_file(discovery_file, k)
         parse_cache[k] = entry
         out["discovery_rules"] = (entry.get("docstring_full") or entry.get("docstring") or "").splitlines()
 
-    # 支撑模块一览（hooks / event_bus / guard / skills ...）
+    # 支撑模块一览（base / manager / discovery 之外的其余 .py）
+    skip = {base_name, manager_name, discovery_name}
     if pm_dir.is_dir():
         for py in sorted(pm_dir.glob("*.py")):
-            if py.name in ("base.py", "manager.py", "discovery.py"):
+            if py.name in skip:
                 continue
-            rel = "plugin_manager/" + py.name          # 输出字段：保持 POSIX 风格
-            k = _pm_key(py.name)                       # 缓存键：与预热同构
+            rel = f"{core_dir}/{py.name}"                # 输出字段：保持 POSIX 风格
+            k = _pm_key(py.name)                         # 缓存键：与预热同构
             entry = parse_cache.get(k) or parse_python_file(py, k)
             parse_cache[k] = entry
             out["support_modules"].append({
-                "module": "plugin_manager." + py.stem,
+                "module": f"{core_dir}.{py.stem}",
                 "docstring": entry["docstring"],
                 "classes": len(entry["classes"]),
                 "functions": len(entry["functions"]),
             })
 
     # Hooks 与事件名（尽力提取常量字符串）
-    for target, label in (("hooks.py", "hooks"), ("event_bus.py", "events")):
+    for target, label in ((str(files.get("hooks") or "hooks.py"), "hooks"),
+                          (str(files.get("event_bus") or "event_bus.py"), "events")):
         f = pm_dir / target
         if not f.exists():
             continue
-        rel = "plugin_manager/" + target               # 输出字段：保持 POSIX 风格
-        k = _pm_key(target)                            # 缓存键：与预热同构
+        rel = f"{core_dir}/{target}"                     # 输出字段：保持 POSIX 风格
+        k = _pm_key(target)                              # 缓存键：与预热同构
         entry = parse_cache.get(k) or parse_python_file(f, k)
         parse_cache[k] = entry
         names: list[str] = []

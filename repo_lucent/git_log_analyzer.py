@@ -28,18 +28,31 @@ class CommitInfo:
 
 
 def _check_git_available(repo_root: Path) -> bool:
-    """检查目录是否为有效的 git 仓库。"""
+    """检查目录**自身**是否为有效的 git 仓库根（而非仅位于某个 .git 之下）。
+
+    用 `rev-parse --show-toplevel` 并比较是否等于 repo_root：直接用 `--git-dir`
+    会向上冒泡找到外层仓库，导致对非 git 子目录读到父仓历史（错误事实）。
+    """
     try:
         result = subprocess.run(
-            ["git", "rev-parse", "--git-dir"],
+            ["git", "rev-parse", "--show-toplevel"],
             cwd=str(repo_root),
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=5,
         )
-        return result.returncode == 0
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         return False
+    if result.returncode != 0:
+        return False
+    top = (result.stdout or "").strip()
+    if not top:
+        return False
+    import os
+    norm = lambda p: os.path.normcase(os.path.normpath(str(p)))
+    return norm(top) == norm(repo_root) or norm(Path(top).resolve()) == norm(repo_root.resolve())
 
 
 def scan_commits(repo_root: Path, since_days: int = 90,

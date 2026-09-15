@@ -31,6 +31,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from _boot import use_baseline_profile  # noqa: E402
+use_baseline_profile()      # 阶段 7：口径须显式声明（见 tests/_boot.py）
+
 from repo_lucent import cli, server as S  # noqa: E402
 
 HERE = Path(__file__).resolve().parent.parent
@@ -144,10 +147,13 @@ def main() -> int:
 
     # ---- 7) bat 启动器引号修复 ----
     bat = (HERE / "start_repolucent.bat").read_text(encoding="utf-8", errors="replace")
-    ok7 = ('"%PYEXE%"' not in bat) and ("%PYEXE%" in bat) and ("where py" not in bat)
+    quoted_pat = '"%PYEXE%"'
+    ok7 = (quoted_pat not in bat) and ("%PYEXE%" in bat) and ("where py" not in bat)
+    _quoted = quoted_pat in bat
+    _unquoted = "%PYEXE%" in bat
+    _old_where = "where py" in bat
     record("bat_pyexe_unquoted", ok7,
-           f"quoted={'\"%PYEXE%\"' in bat} unquoted={'%PYEXE%' in bat} "
-           f"old_where={'where py' in bat}")
+           f"quoted={_quoted} unquoted={_unquoted} old_where={_old_where}")
 
     payload = {"total": len(RESULTS), "passed": sum(1 for r in RESULTS if r["ok"]),
                "failed": sum(1 for r in RESULTS if not r["ok"]), "cases": RESULTS}

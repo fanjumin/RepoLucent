@@ -43,15 +43,24 @@ def run_cli(repo: Path, out: Path, *extra: str) -> subprocess.CompletedProcess:
     """以子进程执行 CLI（与 ``_run_regress.py`` 同口径，避免进程内状态串扰）。
 
     ``--no-date-dir`` 恒开：让产物直接落在 ``out``，便于按固定路径断言。
-    ``REPOLUCENT_SETTINGS`` 一律剔除，避免外部环境变量把本机配置带进测试。
+    ``REPO_LUCENT_SETTINGS`` 一律剔除，避免外部环境变量把本机配置带进测试。
+
+    去 VeroRun 硬编码（阶段 7）：分析口径必须显式声明（改造前"未声明即内置
+    verorun 回落"已删除）。测试金字塔统一以随包 ``profiles/verorun.json``
+    为基线口径——与 ``tests/golden/*`` 快照的录制口径一致。需要别的口径的
+    用例自行追加 ``--profile <名>``（命令行优先级高于此处环境变量）。
     """
     env = dict(os.environ)
     env["PYTHONPATH"] = str(PROJECT_ROOT)
-    env.pop("REPOLUCENT_SETTINGS", None)
+    env.pop("REPO_LUCENT_SETTINGS", None)
+    env.pop("REPOLUCENT_SETTINGS", None)          # 过渡期旧名，一并剔除
+    env.setdefault("REPO_LUCENT_PROFILE", "verorun")
+    env.setdefault("PYTHONIOENCODING", "utf-8")   # OBS-01：子进程统一 UTF-8 输出
     return subprocess.run(
         [sys.executable, "-m", "repo_lucent", "--repo", str(repo),
          "--out", str(out), "--no-date-dir", *extra],
-        capture_output=True, text=True, env=env, cwd=str(PROJECT_ROOT))
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        env=env, cwd=str(PROJECT_ROOT))
 
 
 @pytest.fixture(scope="session")

@@ -177,6 +177,108 @@ def _collect_imports(tree: ast.Module) -> list[str]:
     return sorted(mods)
 
 
+def _collect_import_facts(tree: ast.Module) -> list[dict]:
+    """结构化导入事实，供依赖图解析器重建「绑定名 → 绝对 dotted 源」。
+
+    - `import a.b[.c] [as z]`        → {kind:"import", module:"a.b", level:0, name:None, alias:z|None}
+    - `from x[.y] import m [as n]`  → {kind:"from", module:"x.y", level:N, name:"m", alias:n|None}
+    相对导入(level>0)的 module 为 None 表示 `from . import z`，其绝对路径由
+    调用方结合本文件所属包补全（py_ast 不做包推断，保持纯本地解析）。
+    排序 + 去重保证逐字节确定。
+    """
+    facts: list[dict] = []
+    seen: set[tuple] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for al in node.names:
+                rec = {"kind": "import", "module": al.name, "level": 0,
+                       "name": None, "alias": al.asname}
+            # 上面循环内统一处理（Import 可能有多个 names）
+                key = (rec["kind"], rec["module"], rec["level"], rec["name"], rec["alias"])
+                if key not in seen:
+                    seen.add(key)
+                    facts.append(rec)
+        elif isinstance(node, ast.ImportFrom):
+            for al in node.names:
+                rec = {"kind": "from", "module": node.module,
+                       "level": int(node.level or 0), "name": al.name,
+                       "alias": al.asname}
+                key = (rec["kind"], rec["module"], rec["level"], rec["name"], rec["alias"])
+                if key not in seen:
+                    seen.add(key)
+                    facts.append(rec)
+    facts.sort(key=lambda r: (r["kind"], r["module"] or "", r["level"],
+                              r["name"] or "", r["alias"] or ""))
+    return facts
+
+
+def _call_target(func: ast.AST) -> str | None:
+    """把一个调用节点的 func 归一成 dotted 目标串（Name / Attribute 链，截 3 段）。"""
+    if isinstance(func, ast.Name):
+        return func.id
+    if isinstance(func, ast.Attribute):
+        parts: list[str] = []
+        cur: ast.AST = func
+        while isinstance(cur, ast.Attribute):
+            parts.append(cur.attr)
+            cur = cur.value
+        if isinstance(cur, ast.Name):
+            parts.append(cur.id)
+        elif isinstance(cur, ast.Call):        # foo(...).bar → 记 "…().bar" 根为占位
+            parts.append("<expr>")
+        else:
+            return None
+        parts.reverse()
+        return ".".join(parts[:3])
+    return None
+
+
+def _collect_call_sites(tree: ast.Module) -> list[dict]:
+    """收集「调用点」：caller(所属函数/方法/模块级) → callee dotted 目标。
+
+    函数级依赖图的数据基础（纯静态启发式，非精确指针分析）。caller 归属：
+    模块顶层 = "@module"；顶层函数 = 函数名；方法 = "类名.方法名"（外层最近的
+    ClassDef/FunctionDef 组合）。按 (caller,target) 去重排序，保证确定。
+    """
+    sites: dict[tuple[str, str], None] = {}
+
+    def walk(node: ast.AST, scope: str) -> None:
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                child_scope = f"{scope}.{child.name}" if scope not in ("", "@module", "module") \
+                    else child.name
+                if scope in ("", "@module", "module"):
+                    child_scope = child.name
+                walk(child, child_scope)
+                continue
+            if isinstance(child, ast.ClassDef):
+                prefix = child.name if scope in ("", "@module", "module") else f"{scope}.{child.name}"
+                walk(child, prefix)
+                continue
+            if isinstance(child, ast.Call):
+                tgt = _call_target(child.func)
+                if tgt:
+                    caller = scope or "@module"
+                    sites[(caller, tgt)] = None
+                walk(child, scope)
+                continue
+            walk(child, scope)
+
+    for top in ast.iter_child_nodes(tree):
+        if isinstance(top, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            walk(top, top.name)
+        elif isinstance(top, ast.ClassDef):
+            walk(top, top.name)
+        else:
+            # 模块级语句里的调用（含嵌套）
+            walk(top, "@module")
+    # 去重：把 "@module" 与空 scope 归一
+    out: dict[tuple[str, str], None] = {}
+    for (caller, tgt) in sites:
+        out[(("@module" if caller in ("", "@module") else caller), tgt)] = None
+    return [{"caller": c, "target": t} for (c, t) in sorted(out)]
+
+
 def parse_python_file(fpath: Path, rel: str, raw: bytes | None = None) -> dict:
     """解析单个 Python 文件，返回结构化摘要。
 
@@ -202,6 +304,8 @@ def parse_python_file(fpath: Path, rel: str, raw: bytes | None = None) -> dict:
         "docstring": None,
         "docstring_full": None,
         "imports": [],
+        "import_facts": [],
+        "calls": [],
         "classes": [],
         "functions": [],
         "blueprints": [],
@@ -223,6 +327,8 @@ def parse_python_file(fpath: Path, rel: str, raw: bytes | None = None) -> dict:
     result["docstring"] = _doc_first(tree)
     result["docstring_full"] = ast.get_docstring(tree)
     result["imports"] = _collect_imports(tree)
+    result["import_facts"] = _collect_import_facts(tree)
+    result["calls"] = _collect_call_sites(tree)
     result["blueprints"], result["routes"] = _extract_routes(tree)
 
     for node in tree.body:  # 只取顶层，保持接口清单聚焦
@@ -302,6 +408,8 @@ def _failed_entry(rel: str, err: str) -> dict:
         "docstring": None,
         "docstring_full": None,
         "imports": [],
+        "import_facts": [],
+        "calls": [],
         "classes": [],
         "functions": [],
         "blueprints": [],
@@ -324,7 +432,14 @@ def _parse_one(item: tuple[str, str]) -> tuple[str, dict, str | None]:
     except OSError as e:
         return rel, _failed_entry(rel, f"OSError: {e}"), None
     try:
-        return rel, parse_python_file(Path(abs_path), rel, raw=raw), cache_key(raw)
+        suffix = str(rel).replace("\\", "/").rsplit("/", 1)[-1]
+        dot = "." + suffix.rsplit(".", 1)[-1].lower() if "." in suffix else ""
+        if dot in (".c", ".cpp", ".cc", ".cxx", ".h", ".hpp", ".hh", ".hxx", ".inl", ".ino", ".pde"):
+            from .cxx_ast import parse_cxx_file
+            entry = parse_cxx_file(Path(abs_path), rel, raw=raw)
+        else:
+            entry = parse_python_file(Path(abs_path), rel, raw=raw)
+        return rel, entry, cache_key(raw)
     except Exception as e:      # noqa: BLE001 —— worker 是进程边界，必须兜住一切异常
         return rel, _failed_entry(rel, f"{type(e).__name__}: {e}"), cache_key(raw)
 

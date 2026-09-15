@@ -1,7 +1,7 @@
 {
   "meta": {
     "schema_version": "1.4",
-    "tool": "repolens",
+    "tool": "repolucent",
     "tool_version": "2.0.0",
     "generated_at": null,
     "repo_root": "fixture_repo",
@@ -530,7 +530,7 @@
   "symbols": {
     "schema": 1,
     "count": 11,
-    "index_file": "repo_lens_symbols.json"
+    "index_file": "repo_lucent_symbols.json"
   },
   "findings": {
     "schema_version": "1.0",

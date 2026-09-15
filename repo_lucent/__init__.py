@@ -46,4 +46,5 @@ ARTIFACT_MD = "repo_lucent_report.md"
 ARTIFACT_HTML = "repo_lucent_report.html"
 ARTIFACT_AI_CONTEXT = "AI_CONTEXT.md"
 ARTIFACT_SYMBOLS = "repo_lucent_symbols.json"
+ARTIFACT_GRAPH = "repo_lucent_graph.json"   # 依赖图派生产物（控制台/图用，非 golden 六件套契约件）
 ARTIFACT_AGENTS_MD = "AGENTS.md"

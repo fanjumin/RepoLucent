@@ -3,7 +3,7 @@
 
 设计边界（与整体哲学一致）：
 - 纯标准库（http.server），零第三方依赖；不接入 LLM，只暴露本工具已有的确定性能力。
-- 默认只绑定 127.0.0.1；POST 请求体做字段白名单与长度限制；不提供任意命令/文件执行。
+- 默认只绑定环回 127.0.0.1 与 ::1；POST 请求体做字段白名单与长度限制；不提供任意命令/文件执行。
 - 所有执行都是进程内复用 cli 的分析管线（_analyze / snapshot / diff / query），
   保证「界面看到的结果」与「命令行/AI 调用的结果」口径完全一致。
 - 同步执行：完整分析 5-30s，UI 用 loading 态等待即可。
@@ -79,6 +79,7 @@ import secrets
 import socket
 import sys
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
@@ -109,6 +110,7 @@ _LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 #: UI 壳 token 注入占位符。token 字符集为 [A-Za-z0-9_-]，与占位符无碰撞可能。
 _TOKEN_PLACEHOLDER = "__REPOLUCENT_TOKEN__"
 _VERSION_PLACEHOLDER = "__REPOLUCENT_VERSION__"
+_SUBTITLE_PLACEHOLDER = "__REPOLUCENT_SUBTITLE__"
 
 
 def resolve_auth_token() -> tuple[str, bool]:
@@ -316,9 +318,14 @@ class _Handler(BaseHTTPRequestHandler):
 @route("GET", "/")
 def _ui_index(h, q, body):
     """UI 壳：服务端把 token 注入页面 JS 上下文（同源策略保证攻击者读不到）。"""
+    from . import config as _cfg
+    import html as _html
+    subtitle = _html.escape(str(getattr(_cfg, "BRANDING", {}).get("subtitle", "")
+                                  or "REPO INSIGHT"), quote=False)
     page = (_UI_PAGE
             .replace(_TOKEN_PLACEHOLDER, h.server.auth_token)
-            .replace(_VERSION_PLACEHOLDER, TOOL_VERSION))
+            .replace(_VERSION_PLACEHOLDER, TOOL_VERSION)
+            .replace(_SUBTITLE_PLACEHOLDER, subtitle))
     return (page.encode("utf-8"), "text/html; charset=utf-8")
 
 
@@ -335,17 +342,20 @@ def _api_state(h, q, body):
     fe = h.state["frontends"]
     out = cfg.out_dir
     report = out / "repo_lucent_report.html"
+    _mtime = report.stat().st_mtime if report.exists() else None
     return _ok({
         "tool_version": TOOL_VERSION,
         "repo": cfg.repo_root.name,
         "repo_path": str(cfg.repo_root),
+        "profile": _effective_profile_name(),
+        "analyzed_at": (time.strftime("%Y-%m-%d %H:%M", time.localtime(_mtime))
+                        if _mtime else None),
         "frontends": [{"root": f["root"], "path": f["path"]} for f in fe],
         "out_dir": str(out),
         "artifact_root": str(cfg.stable_out_dir or out),
         "baselines": list_baselines(cfg.snapshot_dir),
         "report_exists": report.exists(),
-        "report_mtime": (report.stat().st_mtime
-                         if report.exists() else None),
+        "report_mtime": _mtime,
     })
 
 
@@ -362,6 +372,40 @@ def _api_data(h, q, body):
         return _err(404, "NotFound",
                     "分析结果尚未生成：先点「运行完整分析」或 POST /api/analyze")
     return _ok(json.loads(data_file.read_text(encoding="utf-8")))
+
+
+@route("GET", "/api/graph")
+def _api_graph(h, q, body):
+    from . import ARTIFACT_GRAPH
+    gf = h.state["cfg"].out_dir / ARTIFACT_GRAPH
+    if not gf.exists():
+        return _err(404, "NotFound",
+                    "依赖图尚未生成：先点「运行完整分析」或 POST /api/analyze")
+    graph = json.loads(gf.read_text(encoding="utf-8"))
+    scope = (q.get("scope") or ["full"])[0]
+    if scope == "rollup":
+        return _ok({"schema": graph.get("schema"), "granularity": "rollup",
+                    "owners": graph.get("owners"), "stats": graph.get("stats"),
+                    "file_edges": graph.get("file_edges"),
+                    "owner_edges": graph.get("owner_edges")})
+    return _ok(graph)
+
+
+@route("GET", "/api/symbols")
+def _api_symbols(h, q, body):
+    from . import ARTIFACT_SYMBOLS
+    from .symbol_index import index_from_file, search_symbols
+    idx_file = h.state["cfg"].out_dir / ARTIFACT_SYMBOLS
+    if not idx_file.exists():
+        return _err(404, "NotFound",
+                    "符号索引尚未生成：先运行分析（操作 › 运行与分析）")
+    sym = (q.get("symbol") or [""])[0]
+    try:
+        limit = int((q.get("limit") or ["80"])[0])
+    except (TypeError, ValueError):
+        limit = 80
+    index = index_from_file(idx_file)
+    return _ok(search_symbols(index, sym, limit=limit))
 
 
 @route("GET", "/api/report")
@@ -847,6 +891,18 @@ def _api_audit_run(h, q, body):
 
 # ---------------------------------------------------------------- 端点：配置 / 仓库组 ----
 
+def _effective_profile_name() -> str:
+    """当前**生效**的 profile 名（未声明返回空串）。
+
+    去 VeroRun 硬编码（阶段 7）：改造前这里读 `settings.json` 的 `profile.name`，
+    既漏掉 `--profile` / `REPO_LUCENT_PROFILE` 两条通道（控制台显示的"当前口径"
+    会与实际执行口径不符），又在缺省时硬编码回落到 "verorun"。现统一走
+    `settings.active_profile_name()`——它才是三条声明通道的单一事实源。
+    """
+    from .settings import active_profile_name
+    return str(active_profile_name() or "")
+
+
 @route("GET", "/api/settings")
 def _api_settings(h, q, body):
     # 配置展示（OPEN-D）：合并后 settings + 生效 profile。密钥类值一律掩码。
@@ -881,7 +937,7 @@ def _api_settings(h, q, body):
         "tool_version": TOOL_VERSION,
         "config": _mask(raw),
         "profile": get_profile(),
-        "profile_name": str(raw.get("profile", {}).get("name") or "verorun"),
+        "profile_name": _effective_profile_name(),
         "loaded_files": hits,
         "env_status": env_status,
         "project_settings_path": str(_SETTINGS_TOOL_ROOT / "settings.json"),
@@ -892,15 +948,13 @@ def _api_settings(h, q, body):
 def _api_repos(h, q, body):
     # 多仓库注册表（只读）：注册项 + 可用 profile 预设 + 当前仓库名
     from . import repo_registry as RR
-    from .settings import get_profile as _gp
     cur = h.state["cfg"]
-    prof = _gp()
     return _ok({
         "repos": RR.list_repos(),
         "profiles": RR.list_profiles(),
         "current": {"name": getattr(cur, "repo_name", None) or cur.repo_root.name,
                     "path": str(cur.repo_root),
-                    "profile": str(prof.get("name") or "verorun")},
+                    "profile": _effective_profile_name()},
     })
 
 
@@ -952,11 +1006,16 @@ def _api_repos_switch(h, q, body):
     repo_path = Path(ent["path"]).expanduser().resolve()
     if not repo_path.is_dir():
         return _err(400, "BadRequest", f"仓库路径不存在：{repo_path}")
-    from .settings import set_profile_override
+    from .settings import ProfileNotDeclared, set_profile_override
     effective = set_profile_override(ent.get("profile") or None)
     # 用模块限定访问 config：避免函数内 import 遮蔽外层名字（历史教训 DONE-14）。
     from . import config as _config_mod
-    _config_mod.apply_profile()
+    try:
+        _config_mod.apply_profile()
+    except ProfileNotDeclared as e:
+        return _err(400, "ProfileNotDeclared",
+                    f"{e}；请先 `repos add --profile <名>` 为该仓库绑定口径，"
+                    "或设置 REPO_LUCENT_PROFILE。")
     old_cfg = h.state["cfg"]
     # 稳定根 = <out>/<仓库名>（日期归档层之上），切换仓库时按名另起一根，
     # 再套用同一套日期归档规则，保证产物结构一致。
@@ -1134,7 +1193,8 @@ def _api_projects_analyze(h, q, body):
 
     不触碰 h.state（当前 dashboard 指向的仓库不受影响）；按成员 profile 临时
     覆盖全局 settings（与 /api/repos/switch 同款），finally 恢复。子范围强制
-    内置口径（目录视角，无插件识别），UI 侧应标注「目录口径」。
+    随包「目录视角」口径（profiles/directory.json，无组件识别），UI 侧应标注
+    「目录口径」；成员未绑定预设时也回落到它，而不是任何"内置默认"。
     """
     from types import SimpleNamespace
     from . import project_registry as PR
@@ -1155,11 +1215,12 @@ def _api_projects_analyze(h, q, body):
             return _err(400, "BadRequest",
                         f"成员未登记该子范围：{scope}（已登记 {m.get('scopes') or []}）")
         root = Path(m["path"]) / scope
-        eff_profile = None            # 子范围：内置口径（目录视角）
+        # 子范围不是仓库根，谈不上仓库签名 → 用随包发布的"目录视角"口径。
+        eff_profile = "directory"
         label = f"{mname}/{scope}"
     else:
         root = Path(m["path"])
-        eff_profile = m.get("profile") or None
+        eff_profile = m.get("profile") or "directory"
         label = mname
     if not root.is_dir():
         return _err(400, "BadRequest", f"分析目标不存在：{root}")
@@ -1180,9 +1241,16 @@ def _api_projects_analyze(h, q, body):
         data, dur, parse_cache = _analyze(ns, new_cfg)
         written = _write_reports(new_cfg, data, only=only, parse_cache=parse_cache)
         summary = dict(_summary_pairs(data, dur))
+    except S.ProfileNotDeclared as e:
+        return _err(400, "ProfileNotDeclared",
+                    f"{e}；用 `repos add --profile <名>` 为该成员绑定口径，"
+                    "或设置 REPO_LUCENT_PROFILE。")
     finally:
         S.set_profile_override(prev_override)
-        C.apply_profile()
+        try:
+            C.apply_profile()
+        except Exception:  # noqa: BLE001 —— 回滚失败不应掩盖原始返回
+            pass
     return _ok({"ok": True, "target": label, "profile": effective,
                 "out_dir": str(new_cfg.out_dir),
                 "written": [str(p) for p in written], "summary": summary})
@@ -1340,6 +1408,17 @@ class _ConsoleServer(ThreadingHTTPServer):
         self.auth_token = auth_token
 
 
+class _ConsoleServer6(_ConsoleServer):
+    """IPv6 环回监听器：绑定 ::1，让 http://localhost 也能连上。
+
+    现代 Windows 上浏览器解析 `localhost` 常优先返回 IPv6 `::1`；若服务只绑
+    IPv4 `127.0.0.1`，则 `fetch('/api/...')` 对 ::1 连接被拒 → 前端表现为满屏
+    "Failed to fetch"（同源，但连不上）。仅绑 `::1`（而非 `::`），保持纯环回。
+    """
+
+    address_family = socket.AF_INET6
+
+
 def _port_in_use(host: str, port: int) -> bool:
     """探测端口是否已被监听（connect 成功即视为占用）。"""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -1390,9 +1469,33 @@ def start(cfg: RepoConfig, frontends: list, analyzer, summarize,
             print("[repolucent] （token 来自 REPOLUCENT_TOKEN 环境变量，MCP 客户端可固定复用）")
         print(f"[repolucent] MCP 客户端请配置 header: X-RepoLucent-Token: <token>"
               f"（浏览器打开首页会自动注入）")
+    # 双栈环回监听：默认 host=127.0.0.1 时，另起 ::1，兼容浏览器把 localhost
+    # 解析成 IPv6 的情况（否则同源 fetch 连不上 → 满屏 "Failed to fetch"）。
+    srv6 = None
+    if host == "127.0.0.1":
+        try:
+            srv6 = _ConsoleServer6(("::1", port, 0, 0), _Handler, token)
+            threading.Thread(target=srv6.serve_forever, daemon=True).start()
+            print(f"[repolucent] 已同时监听 IPv6 环回：http://localhost:{port}/")
+        except OSError as e:
+            print(f"[repolucent] 提示：IPv6 环回 ::1:{port} 未能监听（{e}）；"
+                  f"请用 http://127.0.0.1:{port}/ 访问。", file=sys.stderr)
+            srv6 = None
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
+        pass
+    finally:
+        try: srv.shutdown()
+        except Exception: pass
+        if srv6 is not None:
+            try: srv6.shutdown()
+            except Exception: pass
+        try: srv.server_close()
+        except Exception: pass
+        if srv6 is not None:
+            try: srv6.server_close()
+            except Exception: pass
         print("\n[repolucent] 已停止")
 
 
@@ -1411,15 +1514,16 @@ _UI_PAGE = r"""<!DOCTYPE html>
 <div class="scr">
   <div class="tbar">
     <span class="tbd"><span class="vmark" style="width:15px;height:15px;border-radius:4px;font-size:9px">V</span>RepoLucent</span>
-    <span>本地控制台 · 仅绑定 127.0.0.1</span>
+    <span>本地控制台 · 仅绑定环回 127.0.0.1 / ::1</span>
     <span class="winv"><span>—</span><span>□</span><span>?</span></span>
   </div>
   <div class="hdr">
-    <div class="brand"><span class="vmark">R</span><span><span class="bname">RepoLucent</span><br><span class="bsub">CODE LENS</span></span><span class="edchip">v__REPOLUCENT_VERSION__</span></div>
+    <div class="brand"><span class="vmark">R</span><span><span class="bname">RepoLucent</span><br><span class="bsub">__REPOLUCENT_SUBTITLE__</span></span><span class="edchip">v__REPOLUCENT_VERSION__</span></div>
     <div class="cmdbar"><span>仓库洞察 · 分析 / 门禁 / 审计 / 脚本</span></div>
     <div class="hspace"></div>
     <span class="ibtn">?</span>
   </div>
+  <div class="statusbar" id="statusbar"><span class="sb-hint">读取仓库状态中…</span></div>
   <div class="sbody">
     <aside class="sider" id="sider"></aside>
     <main class="smain" id="smain"></main>
@@ -1434,4 +1538,5 @@ _UI_PAGE = r"""<!DOCTYPE html>
 </div>
 <script src="/static/icons.js"></script>
 <script src="/static/app.js"></script>
+<script src="/static/insight.js"></script>
 </body></html>"""

@@ -30,6 +30,9 @@ FIXTURE_BUDGET_MS = 30_000
 
 PERF_REPO_ENV = "REPOLUCENT_PERF_REPO"
 
+#: 真实仓库采集时的分析口径（去 VeroRun 硬编码后，口径必须显式声明）。
+PERF_PROFILE_ENV = "REPOLUCENT_PERF_PROFILE"
+
 
 def _summary(text: str) -> dict:
     """把 `--summary-only` 的 key=value 输出解析成字典。"""
@@ -121,6 +124,7 @@ def test_real_repo_metrics_are_reported():
 
     运行方式：
         set REPOLUCENT_PERF_REPO=F:\\Sites\\VeroRun
+        set REPOLUCENT_PERF_PROFILE=verorun     (可选，默认 verorun)
         pytest tests/perf -s
     """
     from pathlib import Path
@@ -129,13 +133,17 @@ def test_real_repo_metrics_are_reported():
 
     repo = Path(os.environ[PERF_REPO_ENV])
     assert repo.is_dir(), f"{PERF_REPO_ENV} 指向的不是目录：{repo}"
+    profile = os.environ.get(PERF_PROFILE_ENV, "verorun")
     env = dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[2]))
+    env.setdefault("PYTHONIOENCODING", "utf-8")   # OBS-01：子进程统一 UTF-8 输出
+    env.pop("REPO_LUCENT_SETTINGS", None)
     for tag in ("cold", "hot"):
         r = subprocess.run(
             [sys.executable, "-m", "repo_lucent", "--repo", str(repo),
+             "--profile", profile,
              "--out", str(Path(os.environ.get("TEMP", "/tmp")) / "repolucent_perf"),
              "--no-date-dir", "--summary-only"],
-            capture_output=True, text=True, env=env)
+            capture_output=True, text=True, encoding="utf-8", errors="replace", env=env)
         s = _summary(r.stdout)
         print(f"\n    {tag}: duration_ms={s.get('duration_ms')} "
               f"files={s.get('files')} lines={s.get('lines_total')} "

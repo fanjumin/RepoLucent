@@ -1,6 +1,6 @@
-# 仓库架构洞察报告（RepoLens）
+# 仓库架构洞察报告（RepoLucent）
 
-> 由 RepoLens v2.0.0 自动生成 · None · 仓库 `fixture_repo` · 耗时 None ms
+> 由 RepoLucent v2.0.0 自动生成 · None · 仓库 `fixture_repo` · 耗时 None ms
 
 ## 1. 总览
 

@@ -170,3 +170,89 @@ input:focus, select:focus { outline:none; border-color:var(--sac); box-shadow:0 
 .querybar input[type=text] { flex:1; min-width:160px; }
 .foot { color:var(--sik3); font-size:.72rem; max-width:1180px; margin:0 auto; padding:0 1.2rem 2rem; display:flex; justify-content:space-between; flex-wrap:wrap; gap:.4rem; }
 @media(max-width:640px){ .sider{width:auto} .tmeta{text-align:left;width:100%} .topbar{gap:.4rem} }
+
+/* ============ 洞察层：架构依赖图 / 详情抽屉 / 命令面板 ============ */
+.archwrap{display:flex;gap:12px;align-items:stretch;min-height:540px;}
+.graphpane{flex:1 1 auto;position:relative;background:var(--spanel);border:1px solid var(--sline);border-radius:var(--radius-md);overflow:hidden;min-width:0;}
+.graph{width:100%;height:100%;min-height:540px;display:block;}
+.graphpane .gedge{stroke:var(--sik3);stroke-width:1;}
+.graphpane .gnode{stroke:var(--sbg);stroke-width:1.5;cursor:pointer;transition:r var(--fast);}
+.graphpane .g-core{fill:var(--sac);}
+.graphpane .g-biz{fill:#6aa6ff;}
+.graphpane .g-edge{fill:var(--sik2);}
+.graphpane .g-viol{stroke:var(--sdgr);stroke-width:2.5;}
+.graphpane .g-sel{stroke:var(--sac);stroke-width:3;}
+.graphpane .glabel{fill:var(--sik2);font-size:10px;font-family:var(--font-mono);pointer-events:none;}
+.graphlegend{position:absolute;left:10px;bottom:10px;display:flex;gap:12px;flex-wrap:wrap;background:rgba(0,0,0,.35);padding:6px 10px;border-radius:var(--radius-sm);}
+.graphlegend .lg{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--sik2);}
+.graphlegend i{width:10px;height:10px;border-radius:50%;display:inline-block;}
+.graphlegend .lg-core{background:var(--sac);} .graphlegend .lg-biz{background:#6aa6ff;}
+.graphlegend .lg-edge{background:var(--sik2);} .graphlegend .lg-viol{background:transparent;border:2px solid var(--sdgr);}
+.detailpane{flex:0 0 300px;background:var(--spanel);border:1px solid var(--sline);border-radius:var(--radius-md);padding:12px;overflow:auto;max-height:560px;}
+.detailpane h3.mono{font-family:var(--font-mono);font-size:12px;word-break:break-all;margin-bottom:6px;}
+.detailpane .dsec{margin-top:10px;}
+.detailpane .dsec b{font-size:12px;color:var(--sik2);}
+.ctxpre{white-space:pre-wrap;word-break:break-word;max-height:60vh;overflow:auto;font-family:var(--font-mono);font-size:12px;line-height:1.5;background:var(--spanel2);color:var(--sink);border:1px solid var(--sline2);border-radius:var(--radius-sm);padding:10px;}
+.pal-mask{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding-top:14vh;}
+.pal-box{width:min(560px,92vw);background:var(--spanel2);border:1px solid var(--sline2);border-radius:var(--radius-lg);box-shadow:0 16px 48px rgba(0,0,0,.5);overflow:hidden;}
+.pal-input{width:100%;padding:14px 16px;background:transparent;border:none;border-bottom:1px solid var(--sline);color:var(--sink);font-size:14px;outline:none;}
+.pal-list{max-height:52vh;overflow:auto;padding:6px;}
+.pal-item{padding:9px 12px;border-radius:var(--radius-sm);cursor:pointer;color:var(--sink);font-size:13px;display:flex;justify-content:space-between;gap:10px;}
+.pal-item:hover{background:var(--sac);color:var(--sonac);}
+.pal-item .hint{color:var(--sik3);}
+
+/* 函数级下钻：符号名条目 */
+.detailpane .sym{font-family:var(--font-mono);font-size:12px;margin-top:.4rem;color:var(--sac);}
+.detailpane .sym+.hint{margin-top:2px;}
+
+/* ============ 引导条 / 高级折叠 / 顶栏仓库切换器 ============ */
+.guide{background:var(--saw);border:1px solid var(--sline2);border-left:3px solid var(--sac);
+  border-radius:var(--radius-sm);padding:10px 12px;margin:0 0 12px;font-size:12.5px;line-height:1.55;color:var(--sink);}
+.guide .gsub{margin-top:4px;color:var(--sik2);}
+.ng.ng-toggle{cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none;}
+.ng.ng-toggle:hover{color:var(--sac);}
+.ngcaret{font-size:10px;color:var(--sik3);}
+.switchwrap{display:flex;align-items:center;gap:.45rem;margin-left:.6rem;}
+.switchwrap .slabel{font-size:12px;color:var(--sik2);}
+.switchwrap .switchsel{padding:.28rem .5rem;border-radius:var(--radius-sm);background:var(--spanel2);
+  color:var(--sink);border:1px solid var(--sline2);font-size:12.5px;max-width:15rem;}
+.switchwrap .scurrent{font-family:var(--font-mono);font-size:11.5px;color:var(--sac);
+  background:var(--onac);padding:.15rem .5rem;border-radius:var(--radius-sm);max-width:12rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.btn-sm{padding:.28rem .6rem;font-size:12px;}
+
+/* ============ 添加仓库 引导式弹窗 ============ */
+.ar-mask{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1200;display:flex;align-items:center;justify-content:center;}
+.ar-box{width:min(760px,94vw);max-height:86vh;overflow:auto;background:var(--spanel);color:var(--sink);
+  border:1px solid var(--sline2);border-radius:var(--radius-lg);box-shadow:0 16px 48px rgba(0,0,0,.5);padding:14px 16px;}
+.ar-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.ar-head b{font-size:15px;}
+.ar-box .guide{margin:6px 0 12px;}
+.arrows{display:flex;flex-direction:column;gap:8px;}
+.arow{display:grid;grid-template-columns:minmax(160px,1fr) auto minmax(120px,150px) 120px auto;gap:6px;align-items:center;}
+.arow .arp,.arow .arn{padding:.35rem .5rem;border-radius:var(--radius-sm);background:var(--spanel2);color:var(--sink);border:1px solid var(--sline2);font-size:12.5px;width:100%;}
+.arow .arf{padding:.35rem .4rem;border-radius:var(--radius-sm);background:var(--spanel2);color:var(--sink);border:1px solid var(--sline2);font-size:12.5px;}
+.arowres{font-size:12px;margin:-2px 0 2px 2px;}
+.arowres.ok{color:var(--sok);} .arowres.err{color:var(--sdgr);}
+.ar-foot{display:flex;align-items:center;gap:8px;margin-top:14px;}
+.ar-foot .ar-sp{flex:1;}
+
+/* ============ 顶栏状态条 / verdict 卡 / 高级折叠 ============ */
+.statusbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;padding:.4rem .9rem;
+  background:var(--spanel);border-bottom:1px solid var(--sline);font-size:12.5px;}
+.statusbar .sb-chip{display:inline-flex;align-items:center;gap:.35rem;background:var(--spanel2);
+  border:1px solid var(--sline);border-radius:999px;padding:.15rem .6rem;}
+.statusbar .sb-k{color:var(--sik3);}
+.statusbar .sb-chip b{color:var(--sink);font-weight:600;max-width:18rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.statusbar .sb-hint{color:var(--sik3);}
+.verdict{border-radius:var(--radius-md);padding:.7rem .9rem;margin:0 0 12px;border:1px solid var(--sline2);}
+.verdict.ok{background:var(--sokw);border-color:var(--sok);} .verdict.warn{background:var(--swarnw);border-color:var(--swarn);}
+.verdict.bad{background:var(--sdgrw);border-color:var(--sdgr);}
+.verdict .vtitle{font-size:15px;font-weight:700;margin-bottom:.3rem;}
+.verdict.ok .vtitle{color:var(--sok);} .verdict.warn .vtitle{color:var(--swarn);} .verdict.bad .vtitle{color:var(--sdgr);}
+.verdict .vgrid{display:flex;gap:1.1rem;font-size:12.5px;color:var(--sik2);flex-wrap:wrap;}
+.verdict .vgrid b{color:var(--sink);} .verdict .vgrid b.bad{color:var(--sdgr);}
+.verdict .vn{margin-top:.35rem;font-size:11.5px;color:var(--sik3);}
+details.adv{margin:.4rem 0;border:1px solid var(--sline);border-radius:var(--radius-sm);padding:.2rem .6rem;background:var(--spanel2);}
+details.adv>summary{cursor:pointer;font-size:12.5px;color:var(--sik2);padding:.35rem 0;user-select:none;list-style:none;}
+details.adv>summary::before{content:'▸ ';color:var(--sik3);} details.adv[open]>summary::before{content:'▾ ';}
+details.adv[open]>summary{color:var(--sac);}

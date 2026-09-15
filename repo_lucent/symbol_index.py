@@ -182,7 +182,9 @@ def write_symbol_index(out_dir: Path, index: dict,
                        filename: str = ARTIFACT_SYMBOLS) -> Path:
     """把完整索引写入独立产物文件，返回写入路径。"""
     p = index_path(out_dir, filename)
-    p.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
+    # newline="\n"：符号索引同为受 golden 逐字节契约约束的产物，须跨平台一致。
+    p.write_text(json.dumps(index, ensure_ascii=False, indent=2),
+                 encoding="utf-8", newline="\n")
     return p
 
 

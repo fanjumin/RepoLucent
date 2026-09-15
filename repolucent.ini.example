@@ -1,3 +1,5 @@
 # RepoLucent launcher config (rename to repolucent.ini to use).
 # ASCII only. Values are read by start_repolucent.bat.
 repo=F:\Sites\VeroRun
+# profile = analysis preset name (profiles/<profile>.json), REQUIRED by the tool.
+profile=verorun

@@ -39,7 +39,9 @@ HASH_LEN = 12
 #:              旧缓存条目缺该字段会让符号索引（symbol_index）丢失行号。
 #: v1.7.0 → 3：缓存记录新增 `hash` 字段并引入内容寻址判定，
 #:              旧的「仅签名」记录无法参与哈希比对，故整体失效重建。
-CACHE_VERSION = 3
+#: v2.x → 4：entry 新增 import_facts / calls 两字段（函数级依赖图用），
+#:              旧缓存缺该字段会让 dep_graph 丢边，故整体失效重建。
+CACHE_VERSION = 4
 
 
 #: 单文件缓存判定结果。

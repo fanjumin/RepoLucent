@@ -1,9 +1,12 @@
 @echo off
 rem RepoLucent double-click launcher for Windows.
 rem Usage:
-rem   start_repolucent.bat                  -> repo taken from repolucent.ini, or pass a path as argument 1
-rem   start_repolucent.bat D:\path\to\repo  -> analyze the given repo root
+rem   start_repolucent.bat                    -> repo & profile from repolucent.ini
+rem   start_repolucent.bat D:\path\to\repo    -> analyze the given repo root (profile from ini)
+rem   start_repolucent.bat D:\path\to\repo NAME -> also override the analysis profile NAME
 rem Behavior:
+rem   - the tool REQUIRES an explicit analysis profile; it is resolved as:
+rem       arg2 > env REPO_LUCENT_PROFILE > repolucent.ini profile=
 rem   - port 8788 free   -> start server; server auto-opens the browser page after about 0.8s
 rem   - port 8788 in use -> assume a server is already running, just open the page, do not restart
 rem NOTE: keep this file ASCII-only to avoid codepage issues.
@@ -39,12 +42,29 @@ if not defined REPO (
     exit /b 1
 )
 
+rem --- resolve profile: arg2 > env REPO_LUCENT_PROFILE > repolucent.ini profile= ---
+set "PROFILE="
+if not "%~2"=="" set "PROFILE=%~2"
+if not defined PROFILE if defined REPO_LUCENT_PROFILE set "PROFILE=%REPO_LUCENT_PROFILE%"
+if not defined PROFILE (
+    if exist repolucent.ini (
+        for /f "usebackq eol=# tokens=1,* delims==" %%a in (`findstr /i "^profile=" repolucent.ini`) do set "PROFILE=%%b"
+    )
+)
+if not defined PROFILE (
+    echo [RepoLucent] profile not specified. The tool requires an explicit analysis profile.
+    echo              Set profile= in repolucent.ini, pass it as argument 2,
+    echo              or set REPO_LUCENT_PROFILE. Presets: verorun generic-python directory ruview
+    pause
+    exit /b 2
+)
+
 rem --- port check: if 8788 in use, assume a server is running and just open the page ---
 set "PORT=8788"
 %PYEXE% -c "import socket,sys; s=socket.socket(); s.settimeout(1); sys.exit(0 if s.connect_ex(('127.0.0.1',8788))==0 else 1)" >nul 2>nul
 if errorlevel 1 (
     echo [RepoLucent] starting local console on http://127.0.0.1:%PORT%/ - server will open the browser
-    %PYEXE% "%~dp0repolucent.py" serve --repo "%REPO%" --port %PORT%
+    %PYEXE% "%~dp0repolucent.py" serve --repo "%REPO%" --profile "%PROFILE%" --port %PORT%
     if errorlevel 1 (
         echo.
         echo [RepoLucent] server exited with an error. Read the message above.

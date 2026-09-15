@@ -15,15 +15,20 @@ no runtime dependencies, fully offline.
 
 ```bash
 # 方式一：直接运行（推荐；零安装）
-python repolucent.py --repo <仓库根目录>
+python repolucent.py --repo <仓库根目录> --profile generic-python
 
 # 方式二：pip 安装后获得 repolucent 命令（仍零运行时依赖）
 pip install -e .
-repolucent --repo <仓库根目录> --summary-only
+repolucent --repo <仓库根目录> --profile generic-python --summary-only
 
 # 无子命令即全量分析；自动定位仓库（脚本位于 <repo>/tools/... 时）
-python repolucent.py --summary-only
+REPO_LUCENT_PROFILE=generic-python python repolucent.py --summary-only
 ```
+
+> **分析口径须显式声明**：分析前必须通过 `--profile <名>`、
+> 环境变量 `REPO_LUCENT_PROFILE` 或 `settings.profile.name` 三者之一声明 profile；
+> **均未声明 → 拒绝分析，退出码 2**（提示可用预设）。随包预设 `verorun` / `generic-python` /
+> `directory`，用户自建预设放 `~/.repolucent/profiles/<name>.json`。详见 [SETTINGS.md](SETTINGS.md) §5。
 
 分析产物写入 `<out>/<仓库名>/<日期>/`：`repo_lucent.json`（唯一事实源）、
 `repo_lucent_report.md|html`、`AI_CONTEXT.md`、`repo_lucent_symbols.json`（符号倒排索引）、
@@ -74,7 +79,7 @@ python -m repo_lucent.schema_check <out>/<repo>/<date>/repo_lucent.json
 ```
 
 `SCHEMA_VERSION` 走 MAJOR.MINOR：MAJOR 破坏产物契约；MINOR 只增可选字段，
-消费方必须忽略未识别字段（当前 1.3）。
+消费方必须忽略未识别字段（当前 1.4）。
 
 ## MCP 工具（按需供给）
 
@@ -85,7 +90,7 @@ python -m repo_lucent.schema_check <out>/<repo>/<date>/repo_lucent.json
 
 ## 安全模型（本地控制台）
 
-`repolucent serve` 默认只绑定 `127.0.0.1`，并实施四层递进防护（v1.5.1 起）：
+`repolucent serve` 默认只绑定环回地址 `127.0.0.1` 与 `::1`（同时监听，兼容浏览器把 `localhost` 解析成 IPv6 时同源 fetch 连不上），并实施四层递进防护（v1.5.1 起）：
 
 1. **L1 Host 白名单** —— 请求 Host 头必须属于 `127.0.0.1 / localhost / ::1`，否则 403（封死 DNS rebinding）；
 2. **L2 Origin 校验** —— POST 带 Origin 头时必须为本地来源，否则 403；
@@ -124,8 +129,9 @@ stdio 通道（`repolucent mcp`）不经过 HTTP，无需令牌。
 | `gitflow` | `push` / `pull` / `sync` / `group` / `batch` | **写远程** |
 | `verorun` | `store_probe` / `ssh_readonly_probe` | VeroRun 业务探针 |
 
-`settings.packs.enabled`：`null`（缺省）= 按 profile 默认（`verorun` 全启用，
-故既有行为零变化）；`[]` = **纯只读内核**；`["gitflow"]` = 仅启用列出者。
+`settings.packs.enabled`：`null`（缺省）= 按 **profile 声明**（`profile.packs.enabled`；
+`verorun` → `["gitflow","verorun"]`，`generic-python` → `["gitflow"]`，`directory`/`ruview` → `[]`）；
+`[]` = **纯只读内核**；`["gitflow"]` = 仅启用列出者。
 未启用的 pack，其 CLI 子命令不注册、脚本条目在 `script list` 与 MCP 清单中一并消失。
 
 脚本资产库按 **kind** 分派到四种适配器，新增 kind 必须显式注册，未注册一律拒绝：
@@ -187,7 +193,7 @@ stdio 通道（`repolucent mcp`）不经过 HTTP，无需令牌。
 四层结构（阶段二 2-C 起）。**集成层保持零第三方依赖**，可离线跑；测试金字塔需 pytest。
 
 ```bash
-python _run_regress.py        # 集成层：23 套 verify_* 回归套件（零依赖）
+python _run_regress.py        # 集成层：26 套 verify_* 回归套件（零依赖）
 pip install -e .[test]        # 可选依赖：pytest（仅测试期需要）
 pytest tests/                 # 金字塔全量（85 用例：单元 + golden + 性能门禁）
 pytest tests/unit -q          # 仅单元层（秒级）
@@ -199,7 +205,7 @@ pytest --update-golden        # 显式更新 golden 快照（产物变化随之�
 | 单元层 | `tests/unit/` | 72 | `py_ast` / `cache` 边界用例：BOM、GBK、CRLF、缩进上限、缓存三态判定、worker 契约 |
 | golden 层 | `tests/golden/` | 8 | fixture 仓库 `--deterministic` 五件产物逐字节快照——产物契约的持续验证 |
 | 性能门禁 | `tests/perf/` | 5 | fixture 宽松耗时预算 + 结构性门禁（小批量**不得**启动进程池） |
-| 集成层 | `verify_*.py` | 23 套 | 端到端能力回归，统一入口 `_run_regress.py` |
+| 集成层 | `verify_*.py` | 26 套 | 端到端能力回归，统一入口 `_run_regress.py` |
 
 > 集成层中 `verify_hotspot`（21 例，各建一个合成 git 仓库）耗时最长，在共享盘上约
 > 6–7 分钟，是跑批的主要墙钟构成。
@@ -207,7 +213,7 @@ pytest --update-golden        # 显式更新 golden 快照（产物变化随之�
 真实仓库性能**只做人工采集、不进 CI 硬门禁**（共享盘/网络盘抖动可达数倍，精细阈值必然误报）：
 
 ```bash
-REPOLUCENT_PERF_REPO=F:\Sites\VeroRun pytest tests/perf -s
+REPOLUCENT_PERF_REPO=F:\Sites\VeroRun REPOLUCENT_PERF_PROFILE=verorun pytest tests/perf -s
 ```
 
 ## 许可证

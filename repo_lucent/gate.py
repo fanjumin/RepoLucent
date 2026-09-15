@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from . import config
 from .config import CODE_EXTS
 
 #: 可用检查项。"all" 为集合展开的快捷方式，不参与实际判定。
@@ -19,6 +20,7 @@ GATE_CHOICES = (
     "manifest-invalid",     # 存在 manifest 校验失败的插件
     "boundary-violation",   # 核心模块直接 import 业务插件
     "plugin-cycle",         # 插件间存在循环依赖
+    "include-cycle",        # C/C++/Arduino 头文件循环包含（基于图产物 file→file include 边）
     "route-unprefixed",     # 插件路由未遵循 /admin/<identifier> 前缀惯例
     "file-too-large",       # 单文件代码行超过阈值
     "findings",             # 规则引擎产生 error 级 finding（阶段 F / 2.0.0）
@@ -28,6 +30,33 @@ GATE_CHOICES = (
 #: 默认阈值
 DEFAULT_MAX_FILE_LINES = 2000
 
+#: 与语言/形态无关的通用规则：profile 未声明 ``gates.rules`` 时的可用集。
+#: 只保留 file-too-large——它不假设组件体系、不读 manifest、不需要路由惯例，
+#: 对任意仓库都成立；其余检查项都是"某个形态"的约定，须由 profile 显式声明。
+GATE_GENERIC_RULES: tuple[str, ...] = ("file-too-large",)
+
+
+def active_rules() -> set[str]:
+    """该 profile **支持**的门禁项集合（= profile.gates.rules ∩ GATE_CHOICES）。
+
+    未声明 gates.rules 时返回 GATE_GENERIC_RULES。这里做交集而非直接信任，
+    是为了让 profile 里的笔误不会变成"运行时未知检查项"的崩溃。
+    """
+    enabled = config.GATE_RULES
+    if enabled is None:
+        return set(GATE_GENERIC_RULES)
+    return {str(x) for x in enabled if str(x) in GATE_CHOICES}
+
+
+def active_rule_list() -> list[str]:
+    """该 profile 支持的门禁项，按 GATE_CHOICES 的声明顺序返回（供文档生成用）。
+
+    与 active_rules() 的区别：这里保留稳定顺序。AGENTS.md 要逐项列出，
+    顺序必须确定，否则产物不可 diff。
+    """
+    active = active_rules()
+    return [g for g in GATE_CHOICES if g != "all" and g in active]
+
 
 def default_gates() -> list[str]:
     """--fail-on 未显式给出时的缺省门禁集（档位 A，来自 profile.default_gates）。
@@ -35,6 +64,9 @@ def default_gates() -> list[str]:
     零行为变化约束：未配置 profile.default_gates 时返回 []，即维持历史行为
     「不传 --fail-on 就不跑门禁」。配置后由 expand() 校验合法性（只能从
     GATE_CHOICES 中选，"all" 会被展开），非法项报 ValueError → 退出码 2。
+
+    另按 active_rules() 收窄：缺省集只是"顺手的默认"，不应因为 profile 未支持
+    其中某项就让整次运行失败（用户没有点名该项），故这里静默取交集。
     """
     from .settings import profile_get
     v = profile_get("default_gates", None)
@@ -42,7 +74,8 @@ def default_gates() -> list[str]:
         return []
     if isinstance(v, str):
         v = [s.strip() for s in v.split(",") if s.strip()]
-    return [str(g) for g in v if g]
+    active = active_rules()
+    return [str(g) for g in v if g and (str(g) == "all" or str(g) in active)]
 
 
 @dataclass
@@ -137,16 +170,49 @@ def _check_plugin_cycle(data: dict) -> GateResult:
                       "插件依赖图必须是无环的（depends_on 与实际 import 合并统计）")
 
 
+def _check_include_cycle(data: dict, cfg=None) -> GateResult:
+    """C/C++/Arduino 头文件循环包含门禁（基于图产物 file→file include 边）。
+
+    依赖独立图产物 repo_lucent_graph.json（分析/落盘时生成）；cfg 缺失或图未生成
+    时**跳过并判过**（不误伤），detail 说明原因。Python 调用图无 include 边 → 恒过。
+    """
+    import json
+    from . import ARTIFACT_GRAPH
+    if cfg is None:
+        return GateResult("include-cycle", True, [], "未提供 repo 配置，include 环检测已跳过")
+    gf = cfg.out_dir / ARTIFACT_GRAPH
+    if not gf.exists():
+        return GateResult("include-cycle", True, [],
+                          "依赖图产物未生成（先跑一次分析），include 环检测已跳过")
+    try:
+        graph = json.loads(gf.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return GateResult("include-cycle", True, [], "依赖图产物损坏，include 环检测已跳过")
+    cycles = graph.get("include_cycles") or []
+    hits = [{"file": cyc[0], "detail": "循环包含链：" + " → ".join(cyc)}
+            for cyc in sorted(cycles, key=lambda c: (len(c), c))]
+    return GateResult("include-cycle", not hits, hits,
+                      "头文件 #include 依赖图必须无环（建议用 include guard / 前置声明解环）")
+
+
 def _check_route_unprefixed(data: dict) -> GateResult:
-    """插件路由应遵循 /admin/<identifier> 前缀惯例。
+    """组件路由应遵循 profile.gates.route_prefix_pattern 声明的前缀惯例。
+
+    改造前这里把 ``/admin/<identifier>`` 写死——那是 VeroRun 的惯例，套到别的
+    项目上就是误报。现改为：pattern 由 profile 声明（用 ``{identifier}`` 占位）；
+    未声明（None）时本项整体跳过。
 
     url_prefix 若为非字面量（引用变量或常量），无法确定实际路径，跳过判定
     以避免误报——宁可漏报，不可误伤。
     """
+    pattern = config.ROUTE_PREFIX_PATTERN
+    if not pattern:
+        return GateResult("route-unprefixed", True, [],
+                          "该 profile 未声明路由前缀惯例（route_prefix_pattern），本项跳过")
     hits: list[dict] = []
     for p in data["plugins"]["items"]:
         ident, pdir = p["identifier"], p["dir"]
-        allowed = {f"/admin/{ident}", f"/admin/{pdir}"}
+        allowed = {pattern.format(identifier=ident), pattern.format(identifier=pdir)}
         for r in p["routes"]:
             prefix = (r.get("url_prefix") or "").strip().strip("\"'")
             if not prefix.startswith("/"):
@@ -158,8 +224,10 @@ def _check_route_unprefixed(data: dict) -> GateResult:
                          "detail": f"{r.get('endpoint', '?')} 的 url_prefix="
                                    f"{prefix or '(空)'}，期望 {sorted(allowed)[0]}"})
     hits.sort(key=lambda h: (h["plugin"], h["file"]))
+    label = str(((config.PLUGIN_SYSTEM or {}).get("marker_labels") or {})
+                .get("component") or "组件")
     return GateResult("route-unprefixed", not hits, hits,
-                      "插件 Blueprint 的 url_prefix 应为 /admin/<identifier>")
+                      f"{label} Blueprint 的 url_prefix 应为 {pattern}")
 
 
 def _check_file_too_large(data: dict, cfg, max_file_lines: int) -> GateResult:
@@ -220,21 +288,54 @@ def expand(gates) -> set[str]:
     return chosen
 
 
+def _mentions_all(gates) -> bool:
+    """请求里是否用了 ``all`` 快捷方式（用于区分"点名"与"图省事"）。"""
+    if isinstance(gates, str):
+        return any(s.strip() == "all" for s in gates.split(","))
+    try:
+        return "all" in set(gates)
+    except TypeError:
+        return False
+
+
+#: 检查项实现表（顺序即评估顺序）。新增一项只需在此登记并写一个 _check_* 。
+_KNOWN_RULES = (
+    ("manifest-invalid", _check_manifest_invalid),
+    ("boundary-violation", _check_boundary_violation),
+    ("plugin-cycle", _check_plugin_cycle),
+    ("include-cycle", _check_include_cycle),
+    ("route-unprefixed", _check_route_unprefixed),
+    ("file-too-large", _check_file_too_large),
+    ("findings", _check_findings),
+)
+
+
 def evaluate(gates, data: dict, cfg=None, max_file_lines: int = DEFAULT_MAX_FILE_LINES
              ) -> list[GateResult]:
-    """按名称顺序评估全部选中的检查项，返回结果列表。"""
-    chosen = expand(gates)
+    """按登记顺序评估选中的检查项，返回结果列表。
+
+    两级收窄（阶段 6：门禁集由 profile.gates.rules 驱动）：
+    1) **全局合法性**——不在 GATE_CHOICES 里的名字直接 ValueError（退出码 2），
+       与改造前行为一致；
+    2) **profile 可用性**——``all`` 是无法穷举的图省事写法，静默收窄到该 profile
+       支持的交集；而**逐个点名**了该 profile 不支持的项时抛 ValueError，
+       避免"以为跑了、其实被静默跳过"的假绿。
+    """
+    requested = expand(gates)
+    active = active_rules()
+    unavailable = requested - active
+    if unavailable and not _mentions_all(gates):
+        raise ValueError(
+            f"当前 profile 未启用门禁项: {', '.join(sorted(unavailable))}；"
+            f"该 profile 可用: {', '.join(sorted(active)) or '(无)'}"
+            "。如需启用，请在其 profiles/*.json 的 gates.rules 中声明。")
+    chosen = requested & active
+
     results: list[GateResult] = []
-    if "manifest-invalid" in chosen:
-        results.append(_check_manifest_invalid(data))
-    if "boundary-violation" in chosen:
-        results.append(_check_boundary_violation(data))
-    if "plugin-cycle" in chosen:
-        results.append(_check_plugin_cycle(data))
-    if "route-unprefixed" in chosen:
-        results.append(_check_route_unprefixed(data))
-    if "file-too-large" in chosen:
-        results.append(_check_file_too_large(data, cfg, max_file_lines))
-    if "findings" in chosen:
-        results.append(_check_findings(data))
+    for name, fn in _KNOWN_RULES:
+        if name not in chosen:
+            continue
+        results.append(fn(data, cfg, max_file_lines) if name == "file-too-large"
+                       else fn(data, cfg) if name == "include-cycle"
+                       else fn(data))
     return results

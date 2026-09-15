@@ -23,9 +23,9 @@ DEFAULT_EXCLUDE_DIRS = {
     # 版本控制 / 工具链缓存
     ".git", ".github", ".pytest_cache", ".cache", ".mypy_cache",
     ".idea", ".vscode", ".trae", ".openclaw", ".stock_deps",
-    ".trae-html-share-packages",
+    ".trae-html-share-packages", ".pio",
     # 虚拟环境 / 依赖
-    "venv", ".venv", "env", "node_modules",
+    "venv", ".venv", "env", "node_modules", "libdeps",
     # 本工具自身目录（tools/dev_insight 及 out/ 自产报告不入统计）
     "dev_insight",
     # Python 运行产物
@@ -60,7 +60,17 @@ ROOT_TEMP_EXTS = {".json", ".sig", ".log", ".bak", ".tmp"}
 CODE_EXTS = {
     ".py", ".js", ".jsx", ".ts", ".tsx", ".vue",
     ".html", ".htm", ".css", ".scss", ".sh", ".sql",
+    ".c", ".cpp", ".cc", ".cxx", ".h", ".hpp", ".hh", ".ino", ".pde",
 }
+
+#: 参与 AST 解析的两类前端各自的扩展名（单一事实源；cxx_ast 亦引用同名集合语义）
+PY_EXTS = frozenset({".py"})
+CXX_EXTS = frozenset({
+    ".c", ".cpp", ".cc", ".cxx", ".h", ".hpp", ".hh", ".hxx", ".inl",
+    ".ino", ".pde",
+})
+#: 需要走 AST 前端解析（py 或 cxx）的扩展名并集
+PARSEABLE_EXTS = frozenset(PY_EXTS | CXX_EXTS)
 
 #: 文档/文案/数据类扩展名：文件数照算，但不计代码行（资产文件）
 TEXT_ASSET_EXTS = {
@@ -83,78 +93,92 @@ BINARY_EXTS = {
 # ------------------------------------------------------ 核心模块知识库 ----
 # 描述用于报告可读性；未收录的顶层目录将按"自动识别的 Python 代码模块"处理。
 
-KNOWN_CORE_MODULES = {
-    "plugin_manager": "插件框架：发现/加载/生命周期/Hooks/事件总线/技能注册/商店",
-    "orchestrator": "工作流编排引擎：DAG 节点、调度器、触发分发、安全求值",
-    "agent_matrix": "Agent 矩阵：系统核心角色（is_system=1）与能力聚合注册",
-    "admin": "管理后台服务（Flask 应用）：插件管理、商店、系统设置",
-    "main_site": "主站服务（Flask 应用）：门户页面与站点能力",
-    "auth-center": "认证中心：登录、会话、双因素、系统管理 API",
-    "health_service": "健康检查服务：部署自检与就绪探测",
-    "health_guardian": "守护进程：系统看护、完整性校验",
-    "providers": "Provider 接入层：LLM/模型/外部服务统一适配",
-    "shared": "共享基础设施：HTTP 客户端、日志、可观测性",
-    "i18n": "国际化：系统级翻译函数 _() 与语言管理",
-    "veroguard": "授权防护：许可证校验、防篡改（授权资产保护）",
-    "prompts": "系统提示词资源库",
-    "sdks": "对外 SDK",
-    "themes": "主题资源（design-system / themes.css）",
-    "templates": "服务端 Jinja2 页面模板",
-    "static": "静态资源",
+# 中性空值：具体项目的核心模块职责描述一律由 profile 的 core_modules 提供
+# （VeroRun 的 17 条见 profiles/verorun.json）。此处若保留任何具体项目的内容，
+# 就等于在代码里埋了一份"隐式口径"，会使非该形态的仓库被误标核心目录。
+KNOWN_CORE_MODULES: dict[str, str] = {}
+
+#: 自动识别核心目录时排除的辅助/工具类顶层目录（不算"系统核心"）
+AUTO_CORE_EXCLUDE: set[str] = set()
+
+#: 插件根目录与清单文件名（由 profile.component.dir / component.manifest 提供；
+#: VeroRun = "plugins" / "plugin.json"）。空值表示该仓库没有组件/插件体系。
+PLUGINS_DIR = ""
+MANIFEST_NAME = ""
+
+#: manifest 必填字段回退值（由 profile.component.required_fields 提供）
+MANIFEST_REQUIRED_FALLBACK: list[str] = []
+
+#: 开发规范相关重点文档（存在则收录索引；由 profile.key_docs 提供）
+KEY_DOCS: list[str] = []
+
+#: 规范文档标题正则（由 profile.standard_doc_pattern 提供，如 plugin-standard-v*.md）
+PLUGIN_STANDARD_RE = ""
+
+# --------------------------------------------- 插件体系 / 报告章节（档位 A v2）----
+# 二者口径全部来自 profile；代码内默认一律为"未启用 / 中性"。
+# 注意：这两项**不进入产物 schema**——产物 core.plugin_system 的键集保持不变，
+# "是否启用"只由配置层承载，从而对 --profile verorun 保持零行为漂移。
+
+#: 插件体系识别口径 = profile.plugin_system（core_dir / files / base_class / ...）。
+PLUGIN_SYSTEM: dict = {}
+
+#: 报告章节开关与文案 = profile.report_sections（boundary_rule / redlines / 各章节开关）。
+REPORT_SECTIONS: dict = {}
+
+# ------------------------------------------------------ 门禁 / 品牌（档位 A v2）----
+#: 该 profile **支持**的门禁项 = profile.gates.rules。
+#: None = 未声明 → 只跑与语言/形态无关的通用规则（GATE_GENERIC_RULES），
+#: 避免把"插件 manifest 校验"这类形态特定规则施加到任意仓库上造成误报。
+GATE_RULES: list | None = None
+
+#: 组件路由前缀惯例 = profile.gates.route_prefix_pattern（如 "/admin/{identifier}"）。
+#: None = 该 profile 无此惯例 → route-unprefixed 检查项自动跳过（而非误判失败）。
+ROUTE_PREFIX_PATTERN: str | None = None
+
+#: 品牌（仪表盘标题 / 产物文件名前缀）= profile.branding；缺省为中性通用值，
+#: 使"未声明 branding 的项目"也能得到不像任何具体项目的标题与文件名。
+_DEFAULT_BRANDING: dict[str, str] = {
+    "title": "仓库架构洞察仪表盘",
+    "subtitle": "REPO INSIGHT",
+    "artifact_prefix": "repolucent_deep",
 }
 
-#: 自动识别核心目录时排除的辅助/工具类顶层目录（不算“系统核心”）
-AUTO_CORE_EXCLUDE = {"docs", "deploy", "scripts", "tools"}
+BRANDING: dict = dict(_DEFAULT_BRANDING)
 
-#: 插件根目录与清单文件名（与 plugin_manager/discovery.py 保持一致）
-PLUGINS_DIR = "plugins"
-MANIFEST_NAME = "plugin.json"
 
-#: manifest 必填字段回退值（优先从 docs/plugin-manifest.schema.json 动态读取）
-MANIFEST_REQUIRED_FALLBACK = [
-    "identifier", "name", "version", "description",
-    "author", "min_app_version", "agent_role", "capabilities",
-]
-
-#: 开发规范相关重点文档（存在则收录索引）
-KEY_DOCS = [
-    "AGENTS.md",
-    "GUIDE.md",
-    "CHANGELOG.md",
-    "README.md",
-    "docs/developer-guide.md",
-    "docs/plugin-standard-v1.7.md",
-    "docs/plugin-manifest.schema.json",
-    "docs/i18n-standard.md",
-    "docs/official-api-security-spec.md",
-]
-
-#: 规范文档标题正则（plugin-standard-v*.md）
-PLUGIN_STANDARD_RE = "docs/plugin-standard-v*.md"
+def plugin_system_enabled() -> bool:
+    """插件体系是否启用：显式 plugin_system.enabled 优先；未声明时以 core_dir 推断。"""
+    ps = PLUGIN_SYSTEM or {}
+    if "enabled" in ps:
+        return bool(ps.get("enabled"))
+    return bool(ps.get("core_dir"))
 
 
 # ------------------------------------------------------ 档位 A 通用化 ----
-# 分析口径（仓库签名/组件/核心知识库/排除集等）可由 settings.json 的 profile 段覆盖。
-# 硬约束：无 profile 段（或字段为 null）时，以下 apply_profile() 不改变任何常量值，
-# 行为与改造前完全等价（既有 47 个验证用例必须全绿）。
+# 分析口径（仓库签名/组件/核心知识库/排除集/报告章节/门禁集/品牌等）**只**来自 profile。
+# 强制显式声明：未声明 / 名不存在 / 内容非法 → require_profile() 抛 ProfileNotDeclared，
+# 由调用方转 profile_error_exit()（退出码 2）。代码内常量一律为中性空值，
+# 绝不承载任何具体项目的口径，否则非该形态的仓库会被隐式口径污染。
 
 def apply_profile() -> str:
-    """按 settings.profile 覆盖模块级常量；返回生效的 profile 名。
+    """按 profile 覆盖模块级常量；返回生效的 profile 名。
 
     必须在 cli._setup 中最早调用，且不早于任何 analyzer 的导入绑定——
     因此所有「会受 profile 影响」的常量，使用方一律运行时查 config.X
     （from .config import X 是值绑定，apply_profile 后不会自动更新）。
 
-    回落基线：首次调用时快照内置原始值（_PROFILE_BASELINE）。后续调用中，
+    回落基线：首次调用时快照**中性**原始值（_PROFILE_BASELINE）。后续调用中，
     未被 profile 覆盖的字段一律从快照回落而非沿用当前值——保证同一进程内
     多次切换 profile（测试/长驻服务热改配置）不会发生跨 profile 值污染。
     """
     global PLUGINS_DIR, MANIFEST_NAME, MANIFEST_REQUIRED_FALLBACK, KNOWN_CORE_MODULES
     global AUTO_CORE_EXCLUDE, DEFAULT_EXCLUDE_DIRS, ROOT_ENTRY_ALLOWLIST
-    global KEY_DOCS, PLUGIN_STANDARD_RE
+    global KEY_DOCS, PLUGIN_STANDARD_RE, PLUGIN_SYSTEM, REPORT_SECTIONS
+    global GATE_RULES, ROUTE_PREFIX_PATTERN, BRANDING
 
-    from .settings import profile_get
-    name = profile_get("name", "verorun")
+    from .settings import profile_get, require_profile
+    name, _prof = require_profile()          # 未声明/非法 → ProfileNotDeclared
 
     # ---- 内置基线快照（仅首次）----
     global _PROFILE_BASELINE
@@ -194,6 +218,30 @@ def apply_profile() -> str:
     KEY_DOCS = list(profile_get("key_docs", base["KEY_DOCS"]))
     psr = profile_get("standard_doc_pattern", base["PLUGIN_STANDARD_RE"])
     PLUGIN_STANDARD_RE = str(psr or "")
+
+    # 插件体系与报告章节（v2）：enabled 不落产物，只由配置层承载。
+    _ps = profile_get("plugin_system", None)
+    PLUGIN_SYSTEM = dict(_ps) if isinstance(_ps, dict) else {}
+    _rs = profile_get("report_sections", None)
+    REPORT_SECTIONS = dict(_rs) if isinstance(_rs, dict) else {}
+
+    # 门禁与品牌（v2）：同样只由配置层承载，不进产物 schema。
+    # 每次调用都无条件赋值（含 None / 中性默认），保证多 profile 切换无值污染。
+    _gates = profile_get("gates", None)
+    _gates = _gates if isinstance(_gates, dict) else {}
+    _rules = _gates.get("rules", None)
+    GATE_RULES = ([str(x) for x in _rules if x] if isinstance(_rules, list) else None)
+    _pat = _gates.get("route_prefix_pattern", None)
+    ROUTE_PREFIX_PATTERN = str(_pat) if _pat else None
+
+    _br = profile_get("branding", None)
+    _br = _br if isinstance(_br, dict) else {}
+    BRANDING = {
+        "title": str(_br.get("title") or _DEFAULT_BRANDING["title"]),
+        "subtitle": str(_br.get("subtitle") or _DEFAULT_BRANDING["subtitle"]),
+        "artifact_prefix": str(_br.get("artifact_prefix")
+                               or _DEFAULT_BRANDING["artifact_prefix"]),
+    }
     return str(name)
 
 
@@ -201,17 +249,50 @@ def apply_profile() -> str:
 _PROFILE_BASELINE: dict | None = None
 
 
-def repo_signature() -> dict:
-    """仓库定位特征（autodetect_repo 用）：{"dirs": [...], "files": [...]}。
+#: 仓库定位签名 = profile.repo_signature，**无内置兜底**。
+#: 显式写 {"dirs": [], "files": []} 表示"接受任意目录"；未声明该字段则报错退出。
 
-    未配置时回落到 VeroRun 现状签名（dirs+files 均空 = 接受任意显式 --repo 目录）。
-    """
-    from .settings import profile_get
-    sig = profile_get("repo_signature", None)
+
+def _normalize_signature(sig) -> dict:
+    """把 repo_signature 段规范为 {"dirs": [...], "files": [...]}；非法输入返回空签名。"""
     if not isinstance(sig, dict):
-        sig = {"dirs": ["plugins", "plugin_manager"], "files": []}
+        return {"dirs": [], "files": []}
     return {"dirs": list(sig.get("dirs") or []),
             "files": list(sig.get("files") or [])}
+
+
+def signature_for_profile(profile) -> dict:
+    """按 profile（名 / 已解析 dict / None）返回其 repo_signature；**纯函数，无副作用**。
+
+    供注册期预检（repo_registry.add_repo）使用：不写 settings._PROFILE_OVERRIDE、
+    不改任何模块级常量，因此可在 _setup()/apply_profile() 之外的任意时刻安全调用。
+    profile 无法解析或未声明签名时返回空签名（= 不做签名校验，注册期只警告不阻断）。
+    """
+    from .settings import resolve_profile_source
+    prof = profile if isinstance(profile, dict) else resolve_profile_source(profile)
+    return _normalize_signature((prof or {}).get("repo_signature"))
+
+
+def signature_matches(sig: dict, path) -> bool:
+    """判断目录 path 是否满足签名：dirs 需为已存在目录，files 需为已存在文件。"""
+    p = Path(path)
+    return (all((p / d).is_dir() for d in sig.get("dirs") or [])
+            and all((p / f).is_file() for f in sig.get("files") or []))
+
+
+def repo_signature() -> dict:
+    """当前生效 profile 的仓库定位特征（autodetect_repo 用）。
+
+    强制显式声明后不再有内置兜底：profile 未声明 repo_signature 即报错，
+    提示显式写 {"dirs": [], "files": []} 以表达"接受任意目录"。
+    """
+    from .settings import ProfileNotDeclared, profile_get
+    sig = profile_get("repo_signature", None)
+    if not isinstance(sig, dict):
+        raise ProfileNotDeclared(
+            "当前 profile 未声明 repo_signature；"
+            "确需接受任意目录请显式写 {\"dirs\": [], \"files\": []}")
+    return _normalize_signature(sig)
 
 
 # ------------------------------------------------- 产物按日期归档（DONE-15） ----
@@ -377,10 +458,15 @@ class RepoConfig:
 
     @classmethod
     def autodetect_repo(cls, explicit: str | None, script_file: str) -> "RepoConfig":
-        """定位仓库根目录：显式参数 > 脚本位置推断（<repo>/tools/dev_insight/）> CWD。
+        """定位仓库根目录：显式参数（权威）> 脚本位置推断（<repo>/tools/dev_insight/）> CWD。
 
-        档位 A：匹配特征来自 profile.repo_signature（默认 = VeroRun 现状：
+        档位 A：匹配特征来自 profile.repo_signature（内置默认 = VeroRun 现状：
         需同时存在 plugins/ 与 plugin_manager/；dirs+files 均为空则接受任意目录）。
+
+        FIX(P0-3)：显式指定即权威——显式路径不匹配签名时**立即报错**，不再静默回退到
+        脚本位置或 CWD。修复前 `explicit` 只是候选列表的第一项，不匹配就继续往后试，
+        导致显式指定的仓库被当前工作目录悄悄顶替（实测：显式 --repo 指向 A 仓，
+        实际分析的是 CWD 里的 B 仓，退出码正常且无任何告警）。
         """
         sig = repo_signature()
         need_dirs, need_files = sig["dirs"], sig["files"]
@@ -389,27 +475,30 @@ class RepoConfig:
             return (all((c / d).is_dir() for d in need_dirs)
                     and all((c / f).is_file() for f in need_files))
 
-        candidates: list[Path] = []
-        if explicit:
-            candidates.append(Path(explicit).resolve())
+        def _requirement() -> str:
+            req: list[str] = [f"目录: {', '.join(need_dirs)}"] if need_dirs else []
+            req += [f"文件: {', '.join(need_files)}"] if need_files else []
+            return "；".join(req) if req else "（该 profile 接受任意目录）"
+
         here = Path(script_file).resolve().parent
-        # 部署位置 <repo>/tools/dev_insight/ → 向上两级
-        candidates.append(here.parent.parent)
-        # 工作区开发位置（工具独立目录）→ 向上一级
-        candidates.append(here.parent)
-        for c in candidates:
+        if explicit:
+            c = Path(explicit).resolve()
+            if not _match(c):
+                raise SystemExit(
+                    "[repolucent] 显式路径不匹配当前 profile 的仓库签名"
+                    f"（要求 {_requirement()}）：\n  {c}\n"
+                    "显式指定即视为权威，不会回退到其他目录。\n"
+                    "请确认 profile 是否正确，或用 --profile 指定匹配的技术栈"
+                    "（确需强制注册非标准布局可加 --force）。"
+                )
+            return cls(repo_root=c, out_dir=here / "out")
+        # 未显式指定：按脚本部署位置推断，最后回落到 CWD
+        for c in (here.parent.parent, here.parent, Path.cwd()):
             if _match(c):
                 return cls(repo_root=c, out_dir=here / "out")
-        # 兜底：CWD
-        cwd = Path.cwd()
-        if _match(cwd):
-            return cls(repo_root=cwd, out_dir=here / "out")
-        req: list[str] = [f"目录: {', '.join(need_dirs)}"] if need_dirs else []
-        req += [f"文件: {', '.join(need_files)}"] if need_files else []
         raise SystemExit(
-            "[repolucent] 未找到匹配的仓库根目录（要求"
-            + ("；".join(req) if req else "显式 --repo 指向的任意目录")
-            + "）。\n请用 --repo 参数显式指定，例如：\n"
+            "[repolucent] 未找到匹配的仓库根目录（要求" + _requirement() + "）。\n"
+            "请用 --repo 参数显式指定，例如：\n"
             "  python repolucent.py --repo D:\\projects\\verorun-code"
         )
 

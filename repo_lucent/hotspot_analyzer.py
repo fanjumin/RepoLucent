@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import subprocess
 import time
 from datetime import datetime, timezone
@@ -71,8 +72,29 @@ def _iso_utc(ts: float) -> str:
     return datetime.fromtimestamp(ts, timezone.utc).isoformat()
 
 
+def git_toplevel_matches(root: Path) -> bool:
+    """root 自身是否为 git 仓库根（而非仅"位于某个 .git 之下"）。
+
+    直接跑 `rev-parse --git-dir` 会向上冒泡找到外层仓库，导致对非 git 子目录
+    （如某大仓的子文件夹）误判为有效仓库、并读到父仓历史。故这里取
+    `rev-parse --show-toplevel`，仅当其等于 root 时才认定 root 是仓库根。
+    Windows 大小写不敏感且 git 输出正斜杠，比较时统一分隔符并按 os.path 归一。
+    """
+    out = _run_git(root, ["rev-parse", "--show-toplevel"], timeout=10)
+    if out is None:
+        return False
+    top = out.strip()
+    if not top:
+        return False
+    try:
+        norm = lambda p: os.path.normcase(os.path.normpath(str(p)))
+        return norm(top) == norm(root) or norm(Path(top).resolve()) == norm(root.resolve())
+    except OSError:
+        return False
+
+
 def git_available(root: Path) -> bool:
-    return _run_git(root, ["rev-parse", "--git-dir"], timeout=10) is not None
+    return git_toplevel_matches(root)
 
 
 def _head_sha(root: Path) -> str | None:
@@ -329,15 +351,23 @@ def analyze_hotspots(cfg, days: int = DEFAULT_DAYS,
     }
 
 
+def _group_names() -> set[str]:
+    """变更热点按模块聚合时视为"核心模块"的顶层目录名。
+
+    来自 profile.plugin_system.group_names。刻意与 config.KNOWN_CORE_MODULES 分开：
+    原实现里这两个就是不同的集合（聚合用 12 名、协作分析用 17 名知识库），
+    合并会改变真实仓库的分组结果，属非零漂移。
+    """
+    return set(((config.PLUGIN_SYSTEM or {}).get("group_names")) or [])
+
+
 def _group_of(rel: str) -> str:
-    """把文件归组到 插件 / 核心模块 / 根 / 其他。"""
+    """把文件归组到 组件 / 核心模块 / 根 / 其他（口径来自 profile.plugin_system）。"""
     p = Path(rel)
-    if len(p.parts) >= 3 and p.parts[0] == "plugins":
-        return f"plugins/{p.parts[1]}"
-    if len(p.parts) >= 1 and p.parts[0] in (
-            "plugin_manager", "orchestrator", "agent_matrix", "shared",
-            "i18n", "providers", "auth-center", "admin", "main_site",
-            "health_service", "veroguard", "sdks"):
+    comp_dir = str(config.PLUGINS_DIR or "")
+    if comp_dir and len(p.parts) >= 3 and p.parts[0] == comp_dir:
+        return f"{comp_dir}/{p.parts[1]}"
+    if len(p.parts) >= 1 and p.parts[0] in _group_names():
         return p.parts[0]
     return p.parts[0] if len(p.parts) > 1 else "<root>"
 

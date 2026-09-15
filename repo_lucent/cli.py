@@ -3,7 +3,7 @@
 
 用法：
     python repolucent.py                          # 自动定位仓库（脚本部署在 <repo>/tools/dev_insight/ 时）
-    python repolucent.py --repo D:\\projects\\verorun-code
+    python repolucent.py --profile generic-python --repo D:\\projects\\some-repo
     python repolucent.py --out D:\\tmp\\repolucent_out  # 自定义输出目录
     python repolucent.py --only md,json           # 只生成部分输出（json/md/html/ai/agents/symbols）
     python repolucent.py --agents-md repo         # 额外把 AGENTS.md 写入仓库根（默认只写产物目录）
@@ -27,7 +27,9 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from . import (TOOL_VERSION, SCHEMA_VERSION, ARTIFACT_JSON, ARTIFACT_MD,
-               ARTIFACT_HTML, ARTIFACT_AI_CONTEXT, ARTIFACT_SYMBOLS)
+               ARTIFACT_HTML, ARTIFACT_AI_CONTEXT, ARTIFACT_SYMBOLS, ARTIFACT_GRAPH)
+from .dep_graph import build_graph as _build_graph
+from . import config
 from .config import RepoConfig, ToolConfig, agents_md_setting
 from .fs_scan import scan_overview, render_tree, iter_repo_files
 from .py_ast import parse_files_parallel, parse_python_file, resolve_workers
@@ -207,13 +209,19 @@ def _pack_disabled_text(cmd: str, pack: str) -> str:
 def _build_argparser() -> argparse.ArgumentParser:
     ap = _PackAwareParser(
         prog="repolucent.py",
-        description="RepoLucent —— 通用 Python 仓库架构洞察工具（内置 verorun profile 提供 VeroRun 增强口径），"
+        description="RepoLucent —— 通用 Python 仓库架构洞察工具。分析口径由 "
+                    "--profile / REPO_LUCENT_PROFILE / settings.json 显式声明"
+                    "（随包预设见 profiles/*.json，如 verorun、generic-python、directory）；"
                     "输出结构化架构信息（本地开发辅助工具，不入 Git）。",
     )
-    ap.add_argument("--repo", help="VeroRun 仓库根目录（默认自动定位）")
+    ap.add_argument("--repo", help="仓库根目录（需与当前 profile 的 repo_signature 匹配）")
+    ap.add_argument("--profile", metavar="NAME", default=None,
+                    help="分析口径 profile 名（profiles/<NAME>.json）。也可经环境变量 "
+                         "REPO_LUCENT_PROFILE 或 settings.json 的 profile.name 声明；"
+                         "三者均未声明时直接报错退出（不再有内置默认口径）。")
     ap.add_argument("--out", help="输出目录（默认 <脚本目录>/out）")
-    ap.add_argument("--only", default="json,md,html,ai,agents,symbols",
-                    help="逗号分隔的输出类型：json,md,html,ai,agents,symbols（默认全部）")
+    ap.add_argument("--only", default="json,md,html,ai,agents,symbols,graph",
+                    help="逗号分隔的输出类型：json,md,html,ai,agents,symbols,graph（默认全部）")
     ap.add_argument("--agents-md", choices=("repo", "workspace", "off"), default=None,
                     help="AGENTS.md 输出模式：workspace=写产物目录（默认，绝不触碰仓库"
                          "根）/ repo=写仓库根（会改变 git status，建议 commit 进仓库共享）"
@@ -222,7 +230,8 @@ def _build_argparser() -> argparse.ArgumentParser:
     ap.add_argument("--module", help="指定单核心模块深度分析（如 plugin_manager / orchestrator）")
     ap.add_argument("--plugin", help="指定单插件深度分析（如 shop / stock_analysis）")
     ap.add_argument("--extra-repo", action="append", default=[], metavar="PATH",
-                    help="额外纳入分析的仓库（可重复；默认自动发现同级 verorun-workplace）")
+                    help="额外纳入分析的仓库（可重复；默认按 profile.frontend_repo_names "
+                         "自动发现同级仓库）")
     ap.add_argument("--quiet", action="store_true", help="只输出关键信息")
     ap.add_argument("--deterministic", action="store_true",
                     help="确定性输出：剥离时间戳/耗时/绝对路径，使产物可 diff、可进 Git")
@@ -238,7 +247,9 @@ def _build_argparser() -> argparse.ArgumentParser:
                     help="关闭产物按日期归档，本次运行的产物直接写入 --out 目录")
     ap.add_argument("--fail-on", metavar="ITEMS",
                     help="门禁检查项，逗号分隔；命中则返回退出码 1。可选："
-                         + ", ".join(GATE_CHOICES))
+                         + ", ".join(GATE_CHOICES)
+                         + "。注意：实际可跑项受 profile.gates.rules 限制，"
+                           "未被该 profile 支持的门禁项会报错（all 自动收窄）。")
     ap.add_argument("--fail-on-warn", action="store_true",
                     help="只打印门禁结果，不返回非零退出码（灰度观察用）")
     ap.add_argument("--max-file-lines", type=int, default=DEFAULT_MAX_FILE_LINES,
@@ -260,7 +271,9 @@ def _build_argparser() -> argparse.ArgumentParser:
     ra.add_argument("--name", required=True, metavar="NAME", help="仓库别名（唯一）")
     ra.add_argument("--path", required=True, metavar="PATH", help="仓库根目录")
     ra.add_argument("--profile", default=None, metavar="NAME",
-                    help="分析预设（verorun=内置 / generic-python 等 profiles/*.json）")
+                    help="分析预设（profiles/*.json，如 verorun / generic-python / directory）")
+    ra.add_argument("--force", action="store_true",
+                    help="跳过 profile 签名校验（不匹配时默认只告警，加此项则静默注册）")
     rr = rsub.add_parser("remove", help="移除注册仓库")
     rr.add_argument("--name", required=True, metavar="NAME")
     rr.add_argument("--confirm", action="store_true", help="确认移除（缺省仅预览）")
@@ -434,6 +447,46 @@ def _add_shared_args(ap: argparse.ArgumentParser) -> None:
                     help="禁用 AST 缓存")
     ap.add_argument("--no-date-dir", action="store_true", default=argparse.SUPPRESS,
                     help="关闭产物按日期归档（产物直接写入 --out 目录）")
+    # 全局 --profile 的后置写法：默认 SUPPRESS，避免覆盖已在全局位置解析出的值。
+    ap.add_argument("--profile", metavar="NAME", default=argparse.SUPPRESS,
+                    help="分析口径 profile 名（同全局 --profile，支持写在子命令之后）")
+
+
+def _resolve_repo_root(args, *, default_to_cwd: bool = True) -> Path:
+    """统一解析仓库根目录：--repo > --repo-name > CWD。
+
+    FIX(P0-2)：git 类子命令（log / remote-diff / untracked / ci-check / push / pull）
+    此前各自 `Path(getattr(args, "repo", None) or ".")`，完全绕过 _setup()，导致
+    --help 中声明的 --repo-name 实际不生效、命令静默作用于当前工作目录（实测：
+    `log --repo-name A` 返回的是 CWD 所在仓库的提交历史，退出码 0 且无告警）。
+
+    default_to_cwd=False 用于写操作（push / pull）：必须在 --repo 与 --repo-name
+    中显式给出其一，杜绝"未指定目标时对工作目录发起远端写操作"。
+    """
+    rn = getattr(args, "repo_name", None)
+    if rn:
+        from .repo_registry import resolve as _resolve_registered
+        ent = _resolve_registered(rn)
+        if ent is None:
+            raise SystemExit(f"[repolucent] 注册表中无此仓库：{rn}"
+                             "（先 repolucent repos add 注册）")
+        p = Path(ent["path"]).expanduser()
+        if not p.is_dir():
+            raise SystemExit(f"[repolucent] 注册路径不存在或不是目录：{p}"
+                             f"（仓库 {rn}，请先 repolucent repos add 重新注册）")
+        return p.resolve()
+    rp = getattr(args, "repo", None)
+    if rp:
+        p = Path(rp).expanduser()
+        if not p.is_dir():
+            raise SystemExit(f"[repolucent] 仓库路径不存在或不是目录：{p}")
+        return p.resolve()
+    if default_to_cwd:
+        return Path.cwd().resolve()
+    raise SystemExit(
+        "[repolucent] 请用 --repo <路径> 或 --repo-name <注册名> 指定仓库目标。\n"
+        "本命令会写远端，拒绝在未指定目标时作用于当前工作目录。"
+    )
 
 
 def _run_gates(args, data: dict, cfg, stream) -> int:
@@ -466,8 +519,20 @@ def _run_gates(args, data: dict, cfg, stream) -> int:
 
 
 def _setup(args, with_target: bool = False) -> RepoConfig:
-    """解析仓库定位与输出目录。子命令缺少的参数一律走 getattr 兜底。"""
+    """解析仓库定位与输出目录。子命令缺少的参数一律走 getattr 兜底。
+
+    口径声明优先级（从高到低）：--profile > REPO_LUCENT_PROFILE > settings.json 的
+    profile.name。三者均未声明 → profile_error_exit()（退出码 2），不再静默回落。
+    """
+    from .settings import (ProfileNotDeclared, profile_error_exit,
+                           require_profile, set_profile_override)
+
+    # --profile 为最高优先级通道（同时写入 _OVERRIDE_NAME 供 active_profile_name 读取）。
+    if getattr(args, "profile", None):
+        set_profile_override(args.profile, name=args.profile)
+
     # 多仓库注册表：--repo-name 解析出路径与按仓 profile（必须在 apply_profile 之前生效）。
+    # 注：显式 --profile 优先，注册表绑定不覆盖它。
     rn = getattr(args, "repo_name", None)
     if rn:
         from .repo_registry import resolve
@@ -476,15 +541,25 @@ def _setup(args, with_target: bool = False) -> RepoConfig:
             raise SystemExit(f"[repolucent] 注册表中无此仓库：{rn}（先 repolucent repos add 注册）")
         if not getattr(args, "repo", None):
             args.repo = ent["path"]
-        from .settings import set_profile_override
-        set_profile_override(ent.get("profile") or None)
+        if not getattr(args, "profile", None):
+            set_profile_override(ent.get("profile") or None)
 
-    # 档位 A 通用化：把 settings.profile 的分析口径覆盖到 config 模块级常量。
+    # 强制显式声明：口径缺失/非法一律报错退出。若不校验，apply_profile 会按中性空值
+    # 继续运行，使报告在"无口径"状态下静默产出，反而掩盖配置错误。
+    try:
+        require_profile()
+    except ProfileNotDeclared as e:
+        profile_error_exit(e)          # -> SystemExit(str) -> main() 映射为退出码 2
+
+    # 档位 A 通用化：把 profile 的分析口径覆盖到 config 模块级常量。
     # 必须最先调用——早于 autodetect_repo（用 repo_signature）与任何 analyzer 使用。
     from .config import apply_profile
     apply_profile()
     script_file = Path(__file__).resolve().parent.parent / "repolucent.py"
-    cfg = RepoConfig.autodetect_repo(getattr(args, "repo", None), str(script_file))
+    try:
+        cfg = RepoConfig.autodetect_repo(getattr(args, "repo", None), str(script_file))
+    except ProfileNotDeclared as e:
+        profile_error_exit(e)
     # P0 §4.1 配置外部化：max_* 默认值来自 ToolConfig（可被 settings.json 覆盖），
     # CLI args 仍最高优先（向后兼容：无 settings 时退化为原有内置默认 2 / 60）。
     tc = ToolConfig.from_settings()
@@ -623,8 +698,9 @@ def _analyze_compute(args, cfg: RepoConfig,
     # 无论是否启用缓存，都完整预热 parse_cache，保证两种模式的分析行为完全一致：
     # 各 analyzer 依赖 parse_cache 的填充时机（如 core_analyzer 读 __init__.py 的
     # docstring），预热缺失会导致 package_docstring 等字段出现/消失。
+    _PARSE_EXTS = (".py", ".c", ".cpp", ".cc", ".cxx", ".h", ".hpp", ".hh", ".hxx", ".inl", ".ino", ".pde")
     for rel, fpath in iter_repo_files(cfg):
-        if rel.suffix != ".py":
+        if rel.suffix.lower() not in _PARSE_EXTS:
             continue
         ckey = rel.as_posix()                  # 缓存键：跨运行稳定
         pkey = str(rel)                        # 分析器键：与 analyzer 内部一致
@@ -683,7 +759,7 @@ def _analyze_compute(args, cfg: RepoConfig,
         "standards": standards,
     }
 
-    # ---- 前端/桌面端仓库（v1.4：--extra-repo 或自动发现同级 verorun-workplace）----
+    # ---- 前端/桌面端仓库（v1.4：--extra-repo 或按 profile.frontend_repo_names 自动发现）----
     fe_roots = discover_frontend_repos(cfg)
     if fe_roots:
         data["frontend"] = [f for f in (analyze_frontend(cfg, r) for r in fe_roots)
@@ -771,7 +847,7 @@ def _cmd_analyze(args) -> int:
 
 
 def _write_reports(cfg: RepoConfig, data: dict,
-                   only: str = "json,md,html,ai,agents,symbols",
+                   only: str = "json,md,html,ai,agents,symbols,graph",
                    parse_cache: dict | None = None,
                    agents_md_mode: str | None = None) -> list[Path]:
     """把分析结果落盘为报告产物，返回写入路径列表。
@@ -787,7 +863,10 @@ def _write_reports(cfg: RepoConfig, data: dict,
     only_set = {s.strip().lower() for s in str(only).split(",") if s.strip()}
     if "json" in only_set:
         p = cfg.out_dir / ARTIFACT_JSON
-        p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        # newline="\n"：JSON 产物须跨平台逐字节一致（Windows 默认会把 \n 译成 \r\n，
+        # 破坏"确定性可 diff / 跨机器复现"契约），与 md/html/ai/audit 写盘对齐。
+        p.write_text(json.dumps(data, ensure_ascii=False, indent=2),
+                     encoding="utf-8", newline="\n")
         written.append(p)
     if "md" in only_set:
         p = cfg.out_dir / ARTIFACT_MD
@@ -806,6 +885,13 @@ def _write_reports(cfg: RepoConfig, data: dict,
         written.append(write_symbol_index(cfg.out_dir,
                                          build_symbol_index(parse_cache, cfg),
                                          filename=ARTIFACT_SYMBOLS))
+    if "graph" in only_set and parse_cache is not None:
+        graph = _build_graph(parse_cache, cfg)
+        p = cfg.out_dir / ARTIFACT_GRAPH
+        # newline="\n"：派生产物同样须跨平台逐字节一致
+        p.write_text(json.dumps(graph, ensure_ascii=False, indent=2),
+                     encoding="utf-8", newline="\n")
+        written.append(p)
     if "agents" in only_set:
         mode = agents_md_mode or agents_md_setting()
         p = emit_agents_md(cfg, data, mode)
@@ -817,10 +903,12 @@ def _write_reports(cfg: RepoConfig, data: dict,
         # 名称消毒：deep 产物文件名来自 --module/--plugin（HTTP API 亦可传入），
         # 阻断路径穿越（如 "../../x"），只允许字母数字下划线连字符。
         safe_name = re.sub(r"[^A-Za-z0-9_\-]", "_", dd["name"]) or "target"
-        p = cfg.out_dir / f"verorun_deep_{safe_name}.json"
-        p.write_text(json.dumps(dd, ensure_ascii=False, indent=2), encoding="utf-8")
+        prefix = config.BRANDING.get("artifact_prefix") or "repolucent_deep"
+        p = cfg.out_dir / f"{prefix}_{safe_name}.json"
+        p.write_text(json.dumps(dd, ensure_ascii=False, indent=2),
+                     encoding="utf-8", newline="\n")
         written.append(p)
-        p = cfg.out_dir / f"repolucent_deep_{safe_name}.md"
+        p = cfg.out_dir / f"{prefix}_{safe_name}.md"
         p.write_text(_render_deep_md(dd), encoding="utf-8", newline="\n")
         written.append(p)
     return written
@@ -832,12 +920,16 @@ def _cmd_repos(args) -> int:
     sub = getattr(args, "repos_cmd", None) or "list"
     if sub == "add":
         try:
-            ent = add_repo(args.name, args.path, args.profile)
+            ent = add_repo(args.name, args.path, args.profile,
+                           force=getattr(args, "force", False))
         except ValueError as e:
             print(f"[repolucent] {e}")
             return 2
-        prof = ent.get("profile") or "verorun(内置)"
+        prof = ent.get("profile") or "(未声明)"
         print(f"[repolucent] 已注册：{ent['name']} -> {ent['path']}（profile: {prof}）")
+        if ent.get("warning"):
+            # FIX(P0-1)：注册不阻断，但在注册那一刻就把"这个组合分析会失败 + 怎么修"讲清。
+            print(f"[repolucent] 警告：{ent['warning']}")
         return 0
     if sub == "remove":
         if not args.confirm:
@@ -850,7 +942,7 @@ def _cmd_repos(args) -> int:
     rows = list_repos()
     print(f"{'名称':<20} {'profile':<18} 路径")
     for r in rows:
-        print(f"{r['name']:<20} {(r.get('profile') or 'verorun'):<18} {r.get('path', '')}")
+        print(f"{r['name']:<20} {(r.get('profile') or '(未声明)'):<18} {r.get('path', '')}")
     print(f"\n可用 profile：{', '.join(list_profiles())}；共 {len(rows)} 个仓库")
     return 0
 
@@ -1174,10 +1266,7 @@ def _cmd_search(args) -> int:
 
 def _cmd_log(args) -> int:
     """扫描提交历史。"""
-    repo_root = Path(getattr(args, "repo", None) or ".")
-    if not repo_root.is_absolute():
-        repo_root = Path.cwd() / repo_root
-    repo_root = repo_root.resolve()
+    repo_root = _resolve_repo_root(args)      # FIX(P0-2)：--repo-name 此前被忽略
 
     data = scan_commits(
         repo_root,
@@ -1202,10 +1291,7 @@ def _cmd_log(args) -> int:
 
 def _cmd_remote_diff(args) -> int:
     """分析本地与远程仓库差异。"""
-    repo_root = Path(getattr(args, "repo", None) or ".")
-    if not repo_root.is_absolute():
-        repo_root = Path.cwd() / repo_root
-    repo_root = repo_root.resolve()
+    repo_root = _resolve_repo_root(args)      # FIX(P0-2)：--repo-name 此前被忽略
 
     data = analyze_remote_diff(
         repo_root,
@@ -1226,10 +1312,7 @@ def _cmd_remote_diff(args) -> int:
 
 def _cmd_untracked(args) -> int:
     """检测未跟踪文件并分类。"""
-    repo_root = Path(getattr(args, "repo", None) or ".")
-    if not repo_root.is_absolute():
-        repo_root = Path.cwd() / repo_root
-    repo_root = repo_root.resolve()
+    repo_root = _resolve_repo_root(args)      # FIX(P0-2)：--repo-name 此前被忽略
 
     data = scan_untracked(
         repo_root,
@@ -1368,10 +1451,8 @@ def _cmd_batch(args) -> int:
 
 def _cmd_push(args) -> int:
     """智能推送到远程仓库。"""
-    repo_root = Path(getattr(args, "repo", None) or ".")
-    if not repo_root.is_absolute():
-        repo_root = Path.cwd() / repo_root
-    repo_root = repo_root.resolve()
+    # FIX(P0-2)：--repo-name 此前被忽略；写操作强制显式指定目标，禁止落入 CWD。
+    repo_root = _resolve_repo_root(args, default_to_cwd=False)
 
     result = smart_push(
         repo_root,
@@ -1402,10 +1483,8 @@ def _cmd_push(args) -> int:
 
 def _cmd_pull(args) -> int:
     """智能拉取远程更新。"""
-    repo_root = Path(getattr(args, "repo", None) or ".")
-    if not repo_root.is_absolute():
-        repo_root = Path.cwd() / repo_root
-    repo_root = repo_root.resolve()
+    # FIX(P0-2)：--repo-name 此前被忽略；写操作强制显式指定目标，禁止落入 CWD。
+    repo_root = _resolve_repo_root(args, default_to_cwd=False)
 
     result = smart_pull(
         repo_root,
@@ -1454,10 +1533,7 @@ def _cmd_sync(args) -> int:
 
 def _cmd_ci_check(args) -> int:
     """分析 CI/CD 配置合规性。"""
-    repo_root = Path(getattr(args, "repo", None) or ".")
-    if not repo_root.is_absolute():
-        repo_root = Path.cwd() / repo_root
-    repo_root = repo_root.resolve()
+    repo_root = _resolve_repo_root(args)      # FIX(P0-2)：--repo-name 此前被忽略
 
     data = analyze_ci_config(repo_root, platform=args.platform)
 
@@ -1746,8 +1822,31 @@ def _hint_for(e: BaseException) -> str:
         return "编码或格式异常：先用 --no-cache 重跑排除缓存因素；工具按 UTF-8 → GB18030 回退读取，仍失败需定位具体文件。"
     if isinstance(e, RecursionError):
         return "解析层级过深：检查是否存在异常嵌套的 Python 文件。"
+    if "未声明分析口径" in msg or "未找到 profile 预设" in msg or "repo_signature" in msg:
+        return ("分析口径未声明或无法解析：用 --profile <名> 指定（随包预设见 "
+                "profiles/*.json，如 verorun / generic-python / directory），"
+                "或设环境变量 REPO_LUCENT_PROFILE=<名>，或在 settings.json 写 "
+                "\"profile\": {\"name\": \"<名>\"}。")
+    # FIX(P0-1)：以下按错误语义细分。旧版只要消息里出现"仓库"就一律建议
+    # 「用 --repo 显式指定」——对已经用过 --repo-name 的调用方是死循环式误导。
+    if "profile 的仓库签名" in msg:
+        return ("仓库签名不匹配：该路径不具备当前 profile 要求的特征标记。"
+                "用 --profile 指定匹配的技术栈（repolucent repos list 可列出可用 profile），"
+                "或为该技术栈新增 profiles/<name>.json。")
+    if "未找到匹配的仓库根目录" in msg:
+        return ("未找到仓库根目录：用 --repo <路径> 或 --repo-name <注册名> 显式指定；"
+                "若路径无误则说明 profile 不匹配，用 --profile 指定对应技术栈。")
+    if "注册表中无此仓库" in msg:
+        return ("该别名未注册：先 repolucent repos add --name <NAME> --path <PATH> 注册，"
+                "或 repolucent repos list 查看现有别名。")
+    if "注册路径不存在" in msg:
+        return ("注册信息已失效（路径可能被移动或删除）：用 repolucent repos add "
+                "--name <NAME> --path <PATH> 重新注册。")
+    if "拒绝在未指定目标" in msg:
+        return "写操作必须显式指定目标：加 --repo <路径> 或 --repo-name <注册名>。"
     if "仓库" in msg or "repo" in msg.lower():
-        return "仓库定位失败：用 --repo 显式指定仓库根目录，例如 --repo D:\\projects\\verorun-code"
+        return ("仓库定位失败：用 --repo <路径> 或 --repo-name <注册名> 显式指定仓库根目录"
+                "（--repo-name 需先用 repolucent repos add 注册）。")
     return "未预期的内部错误：先用 --no-cache 重跑一次以排除缓存因素；若仍失败，请把上面的 type 与 message 一并反馈。"
 
 
