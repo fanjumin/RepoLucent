@@ -329,6 +329,12 @@ def _ui_index(h, q, body):
     return (page.encode("utf-8"), "text/html; charset=utf-8")
 
 
+@route("GET", "/favicon.ico")
+def _ui_favicon(h, q, body):
+    """浏览器每次打开页面都会自动请求 /favicon.ico；给 204 No Content 消掉 F12 噪音。"""
+    return (b"", "image/x-icon", 204)
+
+
 @route("GET", "/static/", prefix=True)
 def _ui_static(h, q, body):
     return _serve_static(urlparse(h.path).path[len("/static/"):])
@@ -374,6 +380,31 @@ def _api_data(h, q, body):
     return _ok(json.loads(data_file.read_text(encoding="utf-8")))
 
 
+@route("GET", "/api/infer_profile")
+def _api_infer_profile(h, q, body):
+    """按目录结构推断最合适的分析口径（供"打开仓库"一键流使用）。
+
+    优先级：verorun(plugins+plugin_manager) > embedded(platformio.ini)
+          > generic-python(pyproject.toml) > directory（兜底，接受任意目录）。
+    """
+    from pathlib import Path
+    from .config import signature_for_profile, signature_matches
+    raw = (q.get("path") or [""])[0]
+    if not raw:
+        return _err(400, "BadRequest", "缺少 path 参数")
+    p = Path(raw).expanduser()
+    try:
+        pr = p.resolve()
+    except OSError:
+        return _err(400, "BadRequest", f"路径无法解析：{raw}")
+    if not pr.is_dir():
+        return _err(400, "BadRequest", f"目录不存在：{pr}")
+    for name in ("verorun", "embedded", "generic-python", "directory"):
+        if signature_matches(signature_for_profile(name), pr):
+            return _ok({"path": str(pr), "profile": name})
+    return _ok({"path": str(pr), "profile": "directory"})
+
+
 @route("GET", "/api/graph")
 def _api_graph(h, q, body):
     from . import ARTIFACT_GRAPH
@@ -408,11 +439,53 @@ def _api_symbols(h, q, body):
     return _ok(search_symbols(index, sym, limit=limit))
 
 
+@route("POST", "/api/restart")
+def _api_restart(h, q, body):
+    """原地重启：以脱离式（detached）拉起同命令的新进程，然后本进程自杀。
+    浏览器 3 秒内自动刷新即可连上。仅本机环回（L1 Host 白名单）+ 需 token（L3）触发。"""
+    import subprocess
+    import threading
+    argv0 = sys.argv[0]
+    try:
+        argv0 = os.path.abspath(argv0)
+    except OSError:
+        pass
+    cmd = [sys.executable, argv0] + sys.argv[1:]
+    kwargs = {}
+    if os.name == "nt":
+        kwargs["creationflags"] = (subprocess.DETACHED_PROCESS
+                                   | subprocess.CREATE_NEW_PROCESS_GROUP)
+    else:
+        kwargs["start_new_session"] = True
+    try:
+        subprocess.Popen(cmd, cwd=os.getcwd(), env=os.environ,
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, close_fds=True, **kwargs)
+    except OSError as e:
+        return _err(500, "RestartFailed", f"无法拉起新进程：{e}")
+
+    def _suicide():
+        time.sleep(0.5)      # 让 200 响应先发出去
+        os._exit(0)
+    threading.Thread(target=_suicide, daemon=True).start()
+    return _ok({"ok": True, "message": "服务正在重启，浏览器 3 秒后自动刷新"})
+
+
 @route("GET", "/api/report")
 def _api_report(h, q, body):
     report = h.state["cfg"].out_dir / "repo_lucent_report.html"
     if not report.exists():
         return _err(404, "NotFound", "报告尚未生成，先 POST /api/analyze")
+    return (report.read_bytes(), "text/html; charset=utf-8")
+
+
+@route("GET", "/report")
+def _ui_report(h, q, body):
+    """免 token 的报告视图：iframe / window.open 不能带鉴权头，走这条。
+    仅本机环回（L1 Host 白名单已挡）；报告本身就是用户刚生成的只读产物，无额外权限。"""
+    report = h.state["cfg"].out_dir / "repo_lucent_report.html"
+    if not report.exists():
+        return ("<h3>报告尚未生成，请先运行分析。</h3>".encode("utf-8"), "text/html; charset=utf-8")
     return (report.read_bytes(), "text/html; charset=utf-8")
 
 

@@ -419,7 +419,7 @@
       (hs.groups_top || []).slice(0, 8).forEach(g => { hh += '<tr><td><code>' + esc(g.group) + '</code></td><td class="num">' + g.churn + '</td><td class="num">' + g.files + '</td><td class="num">' + g.loc.toLocaleString() + '</td><td class="num">' + g.high_risk_files + '</td></tr>'; });
       hh += '</table>'; P.push(hh);
     }
-    P.push('<div class="hint">完整明细：<a href="/api/report" target="_blank">打开完整 HTML 报告</a>；或用上方查询精确取数。</div>');
+    P.push('<div class="hint">完整明细：<a href="/report" target="_blank">打开完整 HTML 报告</a>；或用上方查询精确取数。</div>');
     const pn = $('panels'); if (pn) pn.innerHTML = P.join('');
   }
   async function loadData() { try { const d = await api('/api/data'); renderPanels(d); } catch (e) { const pn = $('panels'); if (pn) pn.innerHTML = '<div class="hint">' + esc(e.message) + '</div>'; } }
@@ -428,7 +428,7 @@
     try {
       const r = await api('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
       await showSummary(r.summary); await state(); await loadData();
-      const pv = $('preview'); if (pv) pv.innerHTML = '<section class="card"><div class="chead"><span class="ctitle">完整报告预览</span></div><div class="cbody"><iframe src="/api/report"></iframe></div></section>';
+      const pv = $('preview'); if (pv) pv.innerHTML = '<section class="card"><div class="chead"><span class="ctitle">完整报告预览</span></div><div class="cbody"><iframe src="/report"></iframe></div></section>';
       msg('分析完成，产物已落盘', false);
     } catch (e) { msg(e.message); } busy(0);
   }
@@ -554,7 +554,7 @@
       '<div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.6rem"><b>选择目录</b>' +
       '<span id="ppCrumb" class="hint" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>' +
       '<button class="btn" onclick="VRApp.ppClose()">关闭</button></div>' +
-      '<div id="ppList" style="flex:1;overflow:auto;border:1px solid var(--sline2,rgba(255,255,255,.12));border-radius:8px;padding:.4rem"></div>' +
+      '<div id="ppList" style="flex:1;min-height:260px;max-height:52vh;overflow:auto;border:1px solid var(--sline2,rgba(255,255,255,.12));border-radius:8px;padding:.4rem"></div>' +
       '<div class="toolbar" style="margin-top:.6rem"><button class="btn btn-pri" id="ppUse" onclick="VRApp.ppUse()">使用此目录</button>' +
       '<button class="btn" id="ppUp" onclick="VRApp.ppUp()">上一级</button>' +
       '<span class="hint">⑂ = 含 .git 的仓库目录</span></div></div></div>');
@@ -575,22 +575,35 @@
     $('ppUse').disabled = !d.path;
     $('ppUp').disabled = !d.parent;
     let h = '';
+    const _row = (pp, label) =>
+      '<div class="pprow" data-pp="' + _attr(pp) + '" style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.3rem .5rem;border-radius:6px">' +
+      '<span style="flex:1;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + label + '</span>' +
+      '<button class="btn btn-sm" data-pick="' + _attr(pp) + '" style="padding:.15rem .5rem;font-size:11.5px;flex:0 0 auto">选此</button>' +
+      '</div>';
     if (d.path == null) {
-      (d.roots || []).forEach(r => { h += '<div data-pp="' + _attr(r) + '" style="cursor:pointer;padding:.35rem .5rem;border-radius:6px">💾 ' + esc(r) + '</div>'; });
-      h += '<div data-pp="' + _attr(d.home) + '" style="cursor:pointer;padding:.35rem .5rem;border-radius:6px">🏠 ' + esc(d.home) + '（用户目录）</div>';
+      (d.roots || []).forEach(r => { h += _row(r, '💾 ' + esc(r)); });
+      h += _row(d.home, '🏠 ' + esc(d.home) + '（用户目录）');
     } else {
-      (d.dirs || []).forEach(x => { h += '<div data-pp="' + _attr(x.path) + '" style="cursor:pointer;padding:.35rem .5rem;border-radius:6px">' + (x.is_repo ? '⑂ ' : '📁 ') + esc(x.name) + '</div>'; });
+      (d.dirs || []).forEach(x => { h += _row(x.path, (x.is_repo ? '⑂ ' : '📁 ') + esc(x.name)); });
       if (!(d.dirs || []).length) h += '<p class="hint">（无子目录）</p>';
       if (d.truncated) h += '<p class="hint">（子目录过多已截断，请进入更深层级）</p>';
     }
     const list = $('ppList'); list.innerHTML = h;
     list.querySelectorAll('[data-pp]').forEach(el => {
-      el.addEventListener('click', () => ppRender(el.getAttribute('data-pp')));
-      el.addEventListener('mouseover', () => { el.style.background = 'var(--sline,rgba(255,255,255,.07))'; });
-      el.addEventListener('mouseout', () => { el.style.background = ''; });
+      el.addEventListener('click', (e) => {
+        if (e.target && e.target.getAttribute && e.target.getAttribute('data-pick')) { e.stopPropagation(); ppSelect(e.target.getAttribute('data-pick')); return; }
+        ppRender(el.getAttribute('data-pp'));
+      });
     });
   }
-  function ppUse() { const inp = _ppTarget ? $(_ppTarget) : null; if (inp && _ppCur) inp.value = _ppCur; ppClose(); }
+  function _ppConfirm(chosen) {
+    const inp = _ppTarget ? $(_ppTarget) : null;
+    if (inp && chosen) inp.value = chosen;
+    ppClose();
+    if (window.__ppOnPick) { const cb = window.__ppOnPick; window.__ppOnPick = null; try { cb(chosen); } catch (e) {} }
+  }
+  function ppUse() { _ppConfirm(_ppCur); }
+  function ppSelect(path) { _ppCur = path; _ppConfirm(path); }
   function ppClose() { const ov = $('ppOverlay'); if (ov) ov.style.display = 'none'; }
 
   // ---- 项目分组（projects 视图）----
@@ -692,7 +705,7 @@
     } catch (e) { msg(e.message); } busy(0);
   }
 
-  // ---- 顶栏仓库切换器（单仓为主 · 多仓一键切换）----
+  // ---- 顶栏仓库切换器（单仓为主 · 多仓一键切换 · 支持粘贴路径回车直接分析）----
   async function headerSwitcher() {
     const hspace = document.querySelector('.hdr .hspace'); if (!hspace) return;
     let wrap = document.getElementById('repoSwitch');
@@ -701,34 +714,49 @@
         '<div id="repoSwitch" class="switchwrap"></div>');
       wrap = document.getElementById('repoSwitch');
     }
+    // 先渲染骨架：无论 /api/repos 成功与否，「打开仓库」和粘贴框都在。
+    wrap.innerHTML =
+      '<span class="slabel">仓库</span>' +
+      '<select id="repoSel" class="switchsel" title="已注册仓库"><option>加载中…</option></select>' +
+      '<button class="btn btn-sm" onclick="VRApp.headerSwitch()">切换</button>' +
+      '<input id="openRepoInput" class="switchsel arpath" placeholder="或粘贴仓库目录，回车分析" ' +
+      'onkeydown="if(event.key===\'Enter\')VRApp.openRepoTyped(this.value)">' +
+      '<button class="btn btn-sm btn-pri" onclick="VRApp.openRepoFlow()">打开仓库</button>' +
+      '<button class="btn btn-sm" title="重启后端（改了后端或加了新端点时用）" onclick="VRApp.restartService()">⟳ 重启</button>';
     try {
       const d = await api('/api/repos');
       const cur = (d.current || {}).name || '';
       const list = d.repos || [];
+      const sel = wrap.querySelector('#repoSel');
       const opts = list.map(r =>
         '<option' + (r.name === cur ? ' selected' : '') + ' value="' + esc(r.name) + '">' + esc(r.name) +
         (r.profile ? ' · ' + esc(r.profile) : '') + '</option>').join('');
-      wrap.innerHTML =
-        '<span class="slabel">仓库</span>' +
-        '<select id="repoSel" class="switchsel">' + (opts || '<option value="">（未注册）</option>') + '</select>' +
-        (list.length > 1 ? '<button class="btn btn-sm" onclick="VRApp.headerSwitch()">切换</button>' : '') +
-        '<span class="scurrent" title="' + esc((d.current || {}).path || '') + '">' + esc(cur || '—') + '</span>' +
-        '<button class="btn btn-sm btn-pri" onclick="VRApp.openAddRepo()">＋ 仓库</button>';
-    } catch (e) { /* 静默：注册表读不到不影响其它操作 */ }
+      if (sel) { sel.innerHTML = opts || '<option value="">（暂无）</option>'; sel.title = (d.current || {}).path || ''; }
+    } catch (e) {
+      const sel = wrap.querySelector('#repoSel');
+      if (sel) sel.innerHTML = '<option value="">（读不到）</option>';
+    }
   }
   async function headerSwitch() {
     const sel = document.getElementById('repoSel');
-    if (!sel || !sel.value) { msg('没有可切换的仓库；先到「操作 › 设置 › 多仓库管理」注册'); return; }
+    if (!sel || !sel.value) { msg('请从下拉选一个仓库，或在旁边框里粘贴目录后回车'); return; }
     busy(1);
     try {
       const r = await api('/api/repos/switch', { method: 'POST',
         headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: sel.value }) });
       msg('已切换到 ' + r.name + '（口径 ' + (r.profile || '默认') + '），重新分析中…', false);
       await headerSwitcher();
-      await run();        // 对当前 cfg 触发全量分析并刷新各产物/图
-      route();            // 重挂当前视图 → 洞察屏按新仓取数
+      await run();
+      route();
     } catch (e) { msg(e.message); }
     busy(0);
+  }
+  async function restartService() {
+    if (!window.confirm('重启后端？\n· 老进程会立即退出，新进程自动拉起同样参数。\n· 浏览器 3 秒后自动刷新。')) return;
+    msg('正在重启后端…', false);
+    try { await api('/api/restart', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); }
+    catch (e) { /* 老进程可能在响应前就退了，忽略 */ }
+    setTimeout(function () { location.reload(); }, 3200);
   }
 
   // ---- 暴露给 onclick 的属性 ----
@@ -740,7 +768,7 @@
     auditPreview, auditRun, auditSemPrompt, auditRunWithSemantic,
     loadSettings, mcpOutServers, mcpOutTools, mcpOutCall, llmFormFill, llmSave,
     reposLoad, reposAdd, reposSwitch, reposRemove, summary, artifactsLoad,
-    headerSwitcher, headerSwitch,
+    headerSwitcher, headerSwitch, restartService,
     openPathPicker, ppRender, ppUse, ppClose,
     projLoad, projAdd, projRemove, projSummary, projMemberAdd, projMemberRemove, projAnalyze
   };

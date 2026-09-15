@@ -345,101 +345,73 @@
   window.VRApp.contextLoad = contextLoad; window.VRApp.contextCopy = contextCopy;
   window.VRApp.palette = palette;
 
-  // ================= 添加仓库（可一次多个）引导式弹窗 =================
-  var _AR = [], _AR_PROF = ['directory', 'generic-python', 'embedded', 'verorun'];
-  function arBase(p) { p = String(p || '').replace(/[\\/]+$/, ''); var m = p.split(/[\\/]/); return m[m.length - 1] || ''; }
-  function arRowsHtml() {
-    if (!_AR.length) return '<div class="hint" style="padding:.4rem 0">还没有条目，点「＋ 再加一个仓库」。</div>';
-    return _AR.map(function (r, i) {
-      return '<div class="arow">' +
-        '<input id="arp' + i + '" class="arp" placeholder="仓库目录，如 F:\\Github\\MyRepo" value="' + escA(r.path) + '" oninput="VRApp.addRepoSetPath(' + i + ',this.value)">' +
-        '<button class="btn btn-sm" onclick="VRApp.addRepoPick(' + i + ')">选目录</button>' +
-        '<input class="arn" placeholder="名字（留空=用目录名）" value="' + escA(r.name) + '" oninput="VRApp.addRepoSet(' + i + ',\'name\',this.value)">' +
-        '<select class="arf" onchange="VRApp.addRepoSet(' + i + ',\'profile\',this.value)">' +
-        _AR_PROF.map(function (p) { return '<option' + (p === (r.profile || 'directory') ? ' selected' : '') + '>' + escT(p) + '</option>'; }).join('') +
-        '</select>' +
-        '<button class="btn btn-sm" title="移除这行" onclick="VRApp.addRepoDel(' + i + ')">✕</button>' +
-        '</div>' + (r.result ? '<div class="arowres ' + (r.ok ? 'ok' : 'err') + '">' + escT(r.result) + '</div>' : '');
-    }).join('');
+  // ================= 打开仓库：一键（选目录 → 自动推断口径 → 自动加/切/分析） =================
+  function arBase(p) {
+    p = String(p || '');
+    while (p.length && (p[p.length - 1] === '/' || p[p.length - 1] === '\\')) p = p.slice(0, -1);
+    var i = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
+    return i >= 0 ? p.slice(i + 1) : p;
   }
-  function arRender() { var el = $('arRows'); if (el) el.innerHTML = arRowsHtml(); }
-  function openAddRepo() {
-    _AR = [{ path: '', name: '', profile: 'directory' }];
-    var ov = $('addRepoModal');
-    if (!ov) {
-      document.body.insertAdjacentHTML('beforeend',
-        '<div id="addRepoModal" class="ar-mask" style="display:none"><div class="ar-box">' +
-        '<div class="ar-head"><b>添加仓库到本机注册表</b>' +
-        '<button class="btn btn-sm" onclick="VRApp.closeAddRepo()">✕</button></div>' +
-        '<div class="guide"><b>💡 加进来才能在这里分析/切换。</b>' +
-        '<div class="gsub">填目录即可，名字留空自动用目录名；口径选不准就用 directory（接受任意目录）。可点「＋ 再加一个」一次加多个。</div></div>' +
-        '<div id="arRows" class="arrows"></div>' +
-        '<div class="ar-foot"><button class="btn btn-sm" onclick="VRApp.addRepoAddRow()">＋ 再加一个仓库</button>' +
-        '<span class="ar-sp"></span>' +
-        '<button class="btn" onclick="VRApp.closeAddRepo()">关闭</button>' +
-        '<button class="btn btn-pri" onclick="VRApp.addRepoSave()">保存并切换</button></div>' +
-        '</div></div>');
-      ov = $('addRepoModal');
-      ov.addEventListener('click', function (e) { if (e.target === ov) closeAddRepo(); });
+  function openRepoFlow() {
+    if (!document.getElementById('openRepoTmp')) {
+      document.body.insertAdjacentHTML('beforeend', '<input id="openRepoTmp" style="display:none">');
     }
-    ov.style.display = 'flex'; arRender();
-    api('/api/repos').then(function (d) {
-      if (d && d.profiles && d.profiles.length) {
-        _AR_PROF = d.profiles.indexOf('directory') >= 0 ? d.profiles : ['directory'].concat(d.profiles);
-        arRender();
-      }
-    }).catch(function () {});
+    window.__ppOnPick = function (dir) { if (dir) openRepoRun(dir); };
+    try { window.VRApp.openPathPicker('openRepoTmp'); }
+    catch (e) { msg('打开目录选择器失败：' + e.message); }
   }
-  function closeAddRepo() { var o = $('addRepoModal'); if (o) o.style.display = 'none'; }
-  function addRepoAddRow() { _AR.push({ path: '', name: '', profile: 'directory' }); arRender(); }
-  function addRepoDel(i) { _AR.splice(i, 1); arRender(); }
-  function addRepoSet(i, k, v) { if (_AR[i]) _AR[i][k] = v; }
-  function addRepoSetPath(i, v) { if (_AR[i]) _AR[i].path = v; }
-  function addRepoPick(i) {
-    // 复用 app.js 的目录选择器，选中后回写到该行 path 输入框
-    window.VRApp.openPathPicker('arp' + i);
-    // openPathPicker 直接把值写进目标 input；用户关闭选择器后同步到 _AR
-    setTimeout(function () { var el = $('arp' + i); if (el && _AR[i]) _AR[i].path = el.value; arRender(); }, 500);
-  }
-  async function addRepoSave() {
-    // 先把可能被选择器改写的 path 值收回
-    for (var i = 0; i < _AR.length; i++) { var el = $('arp' + i); if (el) _AR[i].path = el.value; }
-    var todo = _AR.filter(function (r) { return r.path && r.path.trim(); });
-    if (!todo.length) { msg('请先填至少一个仓库目录'); return; }
-    var added = 0, first = null;
-    for (var j = 0; j < _AR.length; j++) {
-      var r = _AR[j]; r.ok = false; r.result = '';
-      if (!r.path || !r.path.trim()) continue;
+  async function openRepoRun(path) {
+    busy(1);
+    try {
+      var base = arBase(path);
+      var profile = 'directory';
       try {
-        var name = (r.name || '').trim() || arBase(r.path);
-        var res = await api('/api/repos/add', { method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name, path: r.path.trim(), profile: r.profile || 'directory', confirm: true }) });
-        r.ok = true; r.name = name;
-        r.result = '已添加：' + name + (res.entry && res.entry.profile ? '（口径 ' + res.entry.profile + '）' : '');
-        added++; first = first || name;
-      } catch (e) { r.result = '失败：' + e.message; }
-    }
-    arRender();
-    if (added) {
-      msg('已添加 ' + added + ' 个仓库' + (first ? '，切换到 ' + first : ''), false);
-      if (window.VRApp.headerSwitcher) window.VRApp.headerSwitcher();
-      if (first) {
-        setTimeout(function () {
-          var sel = $('repoSel'); if (sel) sel.value = first;
-          if (window.VRApp.headerSwitch) window.VRApp.headerSwitch();
-        }, 120);
+        var pr = await api('/api/infer_profile?path=' + encodeURIComponent(path));
+        profile = pr.profile || 'directory';
+      } catch (e) {
+        // 后端没这条端点（旧 serve 未重启）或推断失败 → 兜到 directory 继续跑，别整个卡死
+        msg('口径自动推断端点不可用，先用 directory 继续（如需更准请重启 serve）');
       }
-      setTimeout(closeAddRepo, 900);
-    } else {
-      msg('没有成功添加（见红字）');
-    }
+      var reg = await api('/api/repos');
+      var repos = reg.repos || [];
+      var norm = function (x) {
+        var s = String(x || '');
+        while (s.length && (s[s.length - 1] === '/' || s[s.length - 1] === '\\')) s = s.slice(0, -1);
+        return s.toLowerCase();
+      };
+      var same = null, baseDup = false;
+      for (var i = 0; i < repos.length; i++) {
+        if (norm(repos[i].path) === norm(path)) { same = repos[i].name; break; }
+        if (repos[i].name === base) baseDup = true;
+      }
+      var name = same;
+      if (!same) {
+        name = base;
+        if (baseDup) { var k = 2; var existing = {}; repos.forEach(function(r){existing[r.name]=1;}); while (existing[name]) name = base + '-' + (k++); }
+        await api('/api/repos/add', { method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name, path: path, profile: profile, confirm: true }) });
+      }
+      await api('/api/repos/switch', { method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name }) });
+      msg('已打开 ' + name + '（口径 ' + profile + '），分析中…', false);
+      if (window.VRApp.headerSwitcher) await window.VRApp.headerSwitcher();
+      if (window.VRApp.run) await window.VRApp.run();
+      if (core.reroute) core.reroute();
+    } catch (e) { msg('打开失败：' + e.message); }
+    busy(0);
   }
 
-  window.VRApp.openAddRepo = openAddRepo; window.VRApp.closeAddRepo = closeAddRepo;
-  window.VRApp.addRepoAddRow = addRepoAddRow; window.VRApp.addRepoDel = addRepoDel;
-  window.VRApp.addRepoSet = addRepoSet; window.VRApp.addRepoSetPath = addRepoSetPath;
-  window.VRApp.addRepoPick = addRepoPick; window.VRApp.addRepoSave = addRepoSave;
+  function openRepoTyped(p) {
+    var v = String(p || '').trim().replace(/^["']+|["']+$/g, '');
+    var el = document.getElementById('openRepoInput'); if (el) el.value = '';
+    if (!v) { msg('请粘贴一个仓库目录'); return; }
+    openRepoRun(v);
+  }
+
+  window.VRApp.openRepoFlow = openRepoFlow;
+  window.VRApp.openRepoTyped = openRepoTyped;
+  window.VRApp.openRepoRunPath = openRepoRun;
 
   // insight 注册完成后重跑一次路由，确保默认“架构”视图即时渲染
   if (core.reroute) { try { core.reroute(); } catch (e) {} }

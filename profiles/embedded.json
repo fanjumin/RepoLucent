@@ -1,7 +1,7 @@
 {
   "profile": {
     "name": "embedded",
-    "repo_signature": { "dirs": [], "files": [] },
+    "repo_signature": { "dirs": [], "files": ["platformio.ini"] },
 
     "component": { "dir": "", "manifest": "" },
     "core_modules": {},
