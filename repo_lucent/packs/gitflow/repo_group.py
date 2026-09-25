@@ -1,18 +1,23 @@
 # -*- coding: utf-8 -*-
 """仓库组配置管理与批量操作支持。
 
-通过 ~/.verorun/repos.yaml 管理多仓库分组，支持批量执行 git 相关命令。
+通过 ~/.repolucent/repos.yaml 管理多仓库分组，支持批量执行 git 相关命令。
 配置文件使用简易 YAML 格式（纯文本解析，零第三方依赖）。
+
+配置目录可用环境变量 REPO_LUCENT_HOME 覆盖（CI / 便携部署用）。
 """
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 
-CONFIG_DIR = Path.home() / ".verorun"
+#: 配置目录：REPO_LUCENT_HOME 优先，否则 ~/.repolucent
+#: （改造前硬编码 ~/.verorun，会把本工具的仓库组配置写进另一个产品的目录）。
+CONFIG_DIR = Path(os.environ.get("REPO_LUCENT_HOME") or (Path.home() / ".repolucent"))
 CONFIG_PATH = CONFIG_DIR / "repos.yaml"
 
 

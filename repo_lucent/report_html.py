@@ -8,6 +8,8 @@ from __future__ import annotations
 import html as _h
 
 from . import TOOL_VERSION
+from . import report_text as rt
+from .fs_scan import humanize_bytes
 
 
 def _e(s) -> str:
@@ -79,26 +81,29 @@ def render_html(data: dict) -> str:
     # ---- 代码量统计片段 ----
     code_html = ["<h2>代码量统计</h2>"]
     code_html.append("<h3>按语言 / 扩展名（代码量 TOP）</h3><table><tr><th>类型</th>"
-                     "<th class='num'>代码行</th><th class='num'>文件</th></tr>")
+                     "<th class='num'>代码行</th><th class='num'>文件</th><th class='num'>字节量</th></tr>")
     for e in (ov.get("by_language") or [])[:8]:
         code_html.append(row([f"<td><code>{_e(e['ext']) or '(无)'}</code></td>",
                               f"<td class='num'>{e['code']:,}</td>",
-                              f"<td class='num'>{e['files']}</td>"]))
+                              f"<td class='num'>{e['files']}</td>",
+                              f"<td class='num'>{e.get('bytes', 0):,}（{humanize_bytes(e.get('bytes', 0))}）</td>"]))
     code_html.append("</table>")
     code_html.append("<h3>按顶层目录（代码量 TOP）</h3><table><tr><th>目录</th>"
-                     "<th class='num'>代码行</th><th class='num'>总行</th><th class='num'>文件</th></tr>")
+                     "<th class='num'>代码行</th><th class='num'>总行</th><th class='num'>文件</th><th class='num'>字节量</th></tr>")
     for e in (ov.get("by_top_dir") or [])[:12]:
         code_html.append(row([f"<td><code>{_e(e['dir'])}</code></td>",
                               f"<td class='num'>{e['code']:,}</td>",
                               f"<td class='num'>{e['lines']:,}</td>",
-                              f"<td class='num'>{e['files']}</td>"]))
+                              f"<td class='num'>{e['files']}</td>",
+                              f"<td class='num'>{e.get('bytes', 0):,}（{humanize_bytes(e.get('bytes', 0))}）</td>"]))
     code_html.append("</table>")
     code_html.append("<h3>代码量最大文件 TOP 10</h3><table><tr><th>文件</th>"
-                     "<th class='num'>代码行</th><th class='num'>总行</th></tr>")
+                     "<th class='num'>代码行</th><th class='num'>总行</th><th class='num'>字节量</th></tr>")
     for e in (ov.get("top_files") or [])[:10]:
         code_html.append(row([f"<td><code>{_e(e['file'])}</code></td>",
                               f"<td class='num'>{e['code']:,}</td>",
-                              f"<td class='num'>{e['lines']:,}</td>"]))
+                              f"<td class='num'>{e['lines']:,}</td>",
+                              f"<td class='num'>{e.get('bytes', 0):,}（{humanize_bytes(e.get('bytes', 0))}）</td>"]))
     code_html.append("</table>")
     code_stats_html = "".join(code_html)
 
@@ -192,6 +197,45 @@ def render_html(data: dict) -> str:
         hs_html += (f"<details><summary>插件依赖图（Mermaid）</summary>"
                     f"<pre>{_e(hs['mermaid'])}</pre></details>")
 
+    # ---- 组件契约 / 组件目录 / 清单字段 / 开发流程：文案与开关来自 profile.report_sections ----
+    # 改造前这四处均按 VeroRun 口径无条件输出（含 BasePlugin / plugin.json 字面量）。
+    pctx = rt.plugin_ctx()
+    contract_html = plugin_dir_html = manifest_html = workflow_html = ""
+    if rt.section_enabled("plugin_contract"):
+        contract_html = rt.fmt("html_contract_heading", **pctx)
+        if bp:
+            contract_html += ("\n<p class=\"muted\">"
+                              + rt.fmt("html_contract_note",
+                                       **{**pctx, "fqn": rt.fqn(bp["file"], pctx["base_class"])})
+                              + "</p>")
+        contract_html += ("\n<table><tr><th>方法</th><th>签名</th><th>要求</th><th>说明</th></tr>"
+                          + bp_rows + "</table>") if bp_rows else (
+                              "\n<p>未检出 " + (pctx["base_class"] or "组件基类") + "。</p>")
+        plugin_dir_html = (
+            "<h2>业务插件目录（{} 个）</h2>\n".format(plugins["count"])
+            + "<table><tr><th>插件</th><th>版本</th><th>角色</th><th>分类</th>"
+              "<th>路由</th><th>LOC</th><th>" + (pctx["base_class"] or "组件基类")
+            + "</th><th>manifest</th></tr>\n"
+            + plugin_rows + "</table>\n"
+            + "<p class=\"muted\">✗ manifest 列悬停可查看缺失字段；✗ "
+            + (pctx["base_class"] or "组件基类")
+            + " 列表示未检出继承 " + (pctx["base_class"] or "组件基类") + " 的类。</p>")
+
+    if rt.section_enabled("manifest_fields"):
+        manifest_html = (
+            "<h2>开发规范摘要</h2>\n<div class=\"note\">"
+            + rt.fmt("html_manifest_heading", **pctx) + "："
+            + _e(", ".join(std["manifest_required"])) + "\n<br>来源："
+            + _e(std["manifest_schema_file"] or rt.text("manifest_source_fallback"))
+            + "</div>")
+
+    if rt.section_enabled("workflow_guide"):
+        _wf = rt.fmt_lines("html_workflow", **pctx)
+        if _wf:
+            workflow_html = ("<h2>新插件开发流程</h2>\n<ol>\n"
+                             + "\n".join(f"<li>{x}</li>" for x in _wf)
+                             + "\n</ol>")
+
     return f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -239,6 +283,7 @@ pre {{ background:#0f172a; color:#dbe4f0; padding:14px 16px; border-radius:10px;
 <div class="metric"><b>{plugins['count']}</b><span>业务插件</span></div>
 <div class="metric"><b>{ov['total_files']}</b><span>文件总数（含资产）</span></div>
 <div class="metric"><b>{ov['total_code_lines']:,}</b><span>代码行</span></div>
+<div class="metric"><b>{humanize_bytes(ov.get('total_bytes', 0))}</b><span>仓库字节量</span></div>
 <div class="metric"><b>{route_total}</b><span>插件路由</span></div>
 <div class="metric"><b>{invalid}</b><span>manifest 待修复</span></div>
 </div>
@@ -254,15 +299,9 @@ pre {{ background:#0f172a; color:#dbe4f0; padding:14px 16px; border-radius:10px;
 <table><tr><th>模块</th><th>职责</th><th>.py</th><th>LOC</th><th>关键类</th><th>路由</th></tr>
 {core_rows}</table>
 
-<h2>插件开发契约 BasePlugin</h2>
-<p class="muted">所有插件必须继承 plugin_manager.base.BasePlugin；运行时引用
-（self.manager / self.app / self.plugin_info / self._log）由 PluginManager 注入。</p>
-{f"<table><tr><th>方法</th><th>签名</th><th>要求</th><th>说明</th></tr>{bp_rows}</table>" if bp_rows else "<p>未检出 BasePlugin。</p>"}
+{contract_html}
 
-<h2>业务插件目录（{plugins['count']} 个）</h2>
-<table><tr><th>插件</th><th>版本</th><th>角色</th><th>分类</th><th>路由</th><th>LOC</th><th>BasePlugin</th><th>manifest</th></tr>
-{plugin_rows}</table>
-<p class="muted">✗ manifest 列悬停可查看缺失字段；✗ BasePlugin 列表示未检出继承 BasePlugin 的类。</p>
+{plugin_dir_html}
 
 <h2>核心与插件的交互</h2>
 {dep_html}
@@ -270,9 +309,7 @@ pre {{ background:#0f172a; color:#dbe4f0; padding:14px 16px; border-radius:10px;
 
 {hs_html}
 
-<h2>开发规范摘要</h2>
-<div class="note"><b>plugin.json 必填字段</b>：{_e(', '.join(std['manifest_required']))}
-<br>来源：{_e(std['manifest_schema_file'] or '内置回退清单')}</div>
+{manifest_html}
 {f"<ul>{enums_html}</ul>" if enums_html else ""}
 {f"<p><b>插件标准</b>：{_e(std['plugin_standard']['title'])}（{len(std['plugin_standard']['sections'])} 章，详见 docs/{_e(std['plugin_standard']['file'].split('/')[-1])}）</p>" if std.get('plugin_standard') else ""}
 
@@ -280,13 +317,5 @@ pre {{ background:#0f172a; color:#dbe4f0; padding:14px 16px; border-radius:10px;
 
 {findings_html}
 
-<h2>新插件开发流程</h2>
-<ol>
-<li>复制 <code>plugins/_templates/react_plugin</code>（或 vue）到 <code>plugins/&lt;identifier&gt;/</code></li>
-<li>编写 <code>plugin.json</code>（必填字段 + agent_role 枚举 + capabilities 非空）</li>
-<li>实现 BasePlugin 子类（setup / activate / deactivate 抽象方法）</li>
-<li>Flask Blueprint 暴露路由，惯例 url_prefix=/admin/&lt;identifier&gt;</li>
-<li>数据库走 get_pooled_connection() + 独立 schema；文案走插件 i18n + self.t()</li>
-<li>运行本工具复核校验结果，再按 plugin-standard 提交审核</li>
-</ol>
+{workflow_html}
 </div></body></html>"""

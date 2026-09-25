@@ -33,7 +33,7 @@ DEFAULT_EXCLUDE_DIRS = {
     # 运行时数据 / 备份 / 实验代码 / 构建产物 / 临时
     "data", "backups", "server_backup", "tmp", "temp",
     "poc", "poc2", "dist", "dist-electron", "dist-new",
-    "build", "release", "release-staging",
+    "build", "release", "release-staging", "release-minipro",
     "verorun-plugin-test-report",
     # 文档目录（开发规范文档不参与代码量统计；规范索引仍按需单独读取）
     "docs",

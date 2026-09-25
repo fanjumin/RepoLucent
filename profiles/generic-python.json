@@ -12,6 +12,29 @@
     "key_docs": ["README.md", "CHANGELOG.md", "AGENTS.md"],
     "standard_doc_pattern": "",
     "frontend_repo_names": [],
-    "default_gates": ["file-too-large"]
+
+    "plugin_system": { "enabled": false },
+
+    "report_sections": {
+      "plugin_contract": false,
+      "manifest_fields": false,
+      "interaction_conventions": false,
+      "architecture_redlines": true,
+      "boundary_rule": null,
+      "redlines": [
+        "新增文件必须遵循项目既有目录结构与技术栈；",
+        "操作前先方案后执行；对比/分析类指令只输出报告。"
+      ]
+    },
+
+    "default_gates": ["file-too-large"],
+    "gates": { "rules": ["file-too-large"], "route_prefix_pattern": null },
+
+    "packs": { "enabled": ["gitflow"] },
+
+    "branding": {
+      "title": "仓库架构洞察仪表盘",
+      "artifact_prefix": "repolucent_deep"
+    }
   }
 }

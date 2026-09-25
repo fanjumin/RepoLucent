@@ -112,22 +112,39 @@ def mcp_servers() -> list[dict]:
 
 
 # ------------------------------------------------------ 分析口径 profile ----
-# 档位 A 通用化：把「分析口径」(仓库签名/组件/核心知识库/门禁集等) 收敛到
-# settings.json 的 profile 段。profile 只放分析口径，绝不放密钥（密钥走 get_secret）。
-# 无 profile 段（或任何字段为 null）时，调用方回落到 config.py 内置 VeroRun 常量，
-# 行为与改造前完全等价。
+# 口径唯一来源：分析口径（仓库签名/组件/核心知识库/门禁集/报告章节/品牌等）
+# **只**来自 `profiles/<name>.json`（随包发布）或 `~/.repolucent/profiles/<name>.json`
+# （用户级）。代码内的常量一律是「中性空值」，不再承载任何具体项目的口径——
+# 这消除了改造前「未声明 profile 即静默使用内置 VeroRun 口径」的隐式耦合。
+#
+# 强制显式声明：未声明 profile、profile 名不存在、内容非法——三者一律报错退出
+# （见 require_profile / profile_error_exit），绝不静默降级。
+#
+# profile 只放分析口径，绝不放密钥（密钥走 get_secret）。
 
 #: 多仓库管理（--repo-name / /api/repos/switch）：按仓覆盖 profile 的进程内状态。
 #: 值为 None（无覆盖）或已解析的 profile dict（来自 profiles/<name>.json）。
 _PROFILE_OVERRIDE: dict | None = None
 
+#: 显式声明 profile 的环境变量通道（供 CI / 脚本使用）。
+_PROFILE_ENV = "REPO_LUCENT_PROFILE"
+
+#: 进程内 --profile 覆盖（由 cli._setup / server 在 apply_profile() 之前设置）。
+_OVERRIDE_NAME: str | None = None
+
+
+class ProfileNotDeclared(Exception):
+    """未声明分析口径、或声明的 profile 无法解析。调用方应转 profile_error_exit()。"""
+
 
 def resolve_profile_source(name: str | None):
-    """把 profile 名解析为 dict；找不到或内置名返回 None（= 使用内置 VeroRun 口径）。
+    """把 profile 名解析为 dict；找不到返回 None。
 
     搜索顺序：<tool>/profiles/<name>.json → ~/.repolucent/profiles/<name>.json。
+    改造前这里对 "verorun"/"builtin"/"default" 特判返回 None（= 使用代码内置口径）；
+    该特例已删除——verorun 口径现由随包发布的 profiles/verorun.json 承载。
     """
-    if not name or name in ("verorun", "builtin", "default"):
+    if not name:
         return None
     for base in (_TOOL_ROOT / "profiles", Path.home() / ".repolucent" / "profiles"):
         p = base / f"{name}.json"
@@ -135,34 +152,108 @@ def resolve_profile_source(name: str | None):
             try:
                 d = json.loads(p.read_text(encoding="utf-8"))
                 prof = d.get("profile", d) if isinstance(d, dict) else {}
-                return prof if isinstance(prof, dict) else {}
-            except Exception:  # noqa: BLE001 —— 损坏预设降级为内置口径
+                return prof if isinstance(prof, dict) else None
+            except Exception:  # noqa: BLE001 —— 内容损坏交由 require_profile 报错
                 return None
     return None
 
 
-def set_profile_override(source) -> str:
-    """设置/清除按仓 profile 覆盖；返回实际生效的 profile 名。
+def available_profiles() -> list[str]:
+    """扫描两处 profiles 目录，返回可用预设名（供报错提示列出可选项）。"""
+    names: set[str] = set()
+    for base in (_TOOL_ROOT / "profiles", Path.home() / ".repolucent" / "profiles"):
+        if base.is_dir():
+            names |= {p.stem for p in base.glob("*.json")}
+    return sorted(names)
 
-    source 可为 profile 名（str）、已解析 dict 或 None。必须在 apply_profile() 之前调用。
+
+def active_profile_name() -> str | None:
+    """按优先级返回显式声明的 profile 名；未声明返回 None。
+
+    优先级：--profile（_OVERRIDE_NAME）> REPO_LUCENT_PROFILE > settings.json 的 profile.name。
+    """
+    if _OVERRIDE_NAME:
+        return _OVERRIDE_NAME
+    env = os.environ.get(_PROFILE_ENV)
+    if env and env.strip():
+        return env.strip()
+    p = load_settings().get("profile")
+    if isinstance(p, dict) and p.get("name"):
+        return str(p["name"]).strip() or None
+    return None
+
+
+def require_profile() -> tuple[str, dict]:
+    """解析并返回 (name, profile_dict)；任一环节失败即抛 ProfileNotDeclared。
+
+    `_PROFILE_OVERRIDE`（已解析的 dict）优先——它是权威口径，名字只是标签；
+    否则按 active_profile_name() 的优先级解析，并回填 _PROFILE_OVERRIDE，
+    使 get_profile()/profile_get() 与 apply_profile() 读到同一份口径（单一事实源）。
     """
     global _PROFILE_OVERRIDE
+    prof = _PROFILE_OVERRIDE
+    if not (isinstance(prof, dict) and prof):
+        name = active_profile_name()
+        if not name:
+            raise ProfileNotDeclared("未声明分析口径 profile")
+        prof = resolve_profile_source(name)
+        if prof is None:
+            raise ProfileNotDeclared(
+                f"未找到 profile 预设 `{name}`（或该文件内容损坏）")
+        if not prof:
+            raise ProfileNotDeclared(f"profile `{name}` 内容为空")
+        _PROFILE_OVERRIDE = prof
+    return str(prof.get("name") or "custom"), prof
+
+
+def profile_error_exit(exc: ProfileNotDeclared):
+    """把 ProfileNotDeclared 转为 SystemExit（字符串消息 → main() 映射为退出码 2）。"""
+    avail = available_profiles()
+    hint = (
+        "\n修复方式（任选其一）：\n"
+        "  1) 命令行显式指定：--profile <名>\n"
+        "  2) 环境变量：REPO_LUCENT_PROFILE=<名>\n"
+        "  3) settings.json 写入：\"profile\": {\"name\": \"<名>\"}\n"
+        f"可用预设：{', '.join(avail) if avail else '(未发现任何 profiles/*.json)'}"
+    )
+    raise SystemExit(f"[repolucent] {exc}{hint}")
+
+
+def set_profile_override(source, *, name: str | None = None) -> str | None:
+    """设置/清除按仓 profile 覆盖；返回实际生效的 profile 名（未生效返回 None）。
+
+    source 可为 profile 名（str）、已解析 dict 或 None。必须在 apply_profile() 之前调用。
+    `name` 用于 --profile 通道：既设置 _OVERRIDE_NAME（供 active_profile_name 读取），
+    又解析出 dict 写入 _PROFILE_OVERRIDE。解析失败不抛错——由 require_profile() 统一报错。
+    """
+    global _PROFILE_OVERRIDE, _OVERRIDE_NAME
+    if name is not None:
+        _OVERRIDE_NAME = name or None
     if source is None:
+        # 只清除"按仓覆盖"；进程级声明（_OVERRIDE_NAME，来自 --profile）保持不变，
+        # 使切换/临时覆盖结束后仍能回到启动时声明的口径。
         _PROFILE_OVERRIDE = None
-        return "verorun"
+        return None
     if isinstance(source, str):
+        _OVERRIDE_NAME = source or None
         resolved = resolve_profile_source(source)
         _PROFILE_OVERRIDE = resolved
-        return "verorun" if resolved is None else source
+        return source if resolved is not None else None
     if isinstance(source, dict):
-        _PROFILE_OVERRIDE = source
-        return str(source.get("name") or "custom")
+        _PROFILE_OVERRIDE = source or None
+        _OVERRIDE_NAME = None          # dict 即权威口径，名字取自 prof["name"]
+        return str(source.get("name") or "custom") if source else None
     _PROFILE_OVERRIDE = None
-    return "verorun"
+    _OVERRIDE_NAME = None
+    return None
 
 
 def get_profile() -> dict:
-    """返回当前 profile 配置；缺省返回空 dict（= VeroRun 内置默认）。"""
+    """返回当前生效的 profile 配置；未声明时返回空 dict。
+
+    空 dict 不再意味着"VeroRun 内置默认"——调用方（apply_profile / repo_signature）
+    会把它当作"口径缺失"处理并报错。正常流程中 require_profile() 已将其填充。
+    """
     if _PROFILE_OVERRIDE is not None:
         return _PROFILE_OVERRIDE
     p = load_settings().get("profile", {})
@@ -170,7 +261,11 @@ def get_profile() -> dict:
 
 
 def profile_get(key: str, default=None):
-    """读 profile 字段；未配置（或显式 null）则返回 default（调用方传内置 VeroRun 常量）。"""
+    """读 profile 字段；未配置（或显式 null）则返回 default。
+
+    注意：default 由调用方给出，且**必须**是中性值（空列表/空 dict/空串），
+    不得再传任何具体项目的口径常量。
+    """
     v = get_profile().get(key)
     return default if v is None else v
 

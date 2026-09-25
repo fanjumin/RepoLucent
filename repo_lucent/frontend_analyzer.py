@@ -109,10 +109,14 @@ def analyze_frontend(cfg: RepoConfig, fe_root: Path) -> dict | None:
             "total_asset_files": overview["total_asset_files"],
             "total_lines": overview["total_lines"],
             "total_code_lines": overview["total_code_lines"],
+            "total_bytes": overview["total_bytes"],
+            "total_code_bytes": overview["total_code_bytes"],
             "code_scope_note": overview["code_scope_note"],
             "by_language": overview["by_language"],
             "by_top_dir": overview["by_top_dir"][:12],
             "top_files": overview["top_files"][:10],
+            # 全量逐文件字节量数组（前端仓同样暴露，满足「每个文件」层级）
+            "files": overview["files"],
         },
         "metrics": _count_metrics(fe_root),
         "build_editions": sorted(

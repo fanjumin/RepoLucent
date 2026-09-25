@@ -4,6 +4,7 @@
 落盘纯 ASCII JSON（out/cache_verify.json），便于工具回读；同时在 stdout 打印 [PASS]/[FAIL]。
 """
 import json
+import os
 import sys
 import traceback
 from pathlib import Path
@@ -11,6 +12,15 @@ from types import SimpleNamespace
 
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
+
+from _boot import use_baseline_profile                     # noqa: E402
+use_baseline_profile()      # 阶段 7：口径须显式声明（见 tests/_boot.py）
+
+# memo 命中判据是 id(cfg) + monotonic()//TTL（默认 15s）。若两次 _analyze 恰好跨越
+# 一个 TTL 桶边界，「命中」就会变成「未命中」——本用例因而偶发失败（实测 3 次跑
+# 1 次失败）。这里用文档化的环境变量把 TTL 拉长到不可能在单次用例内翻桶，
+# 让断言变为确定性；TTL 语义本身由 _analysis_freshness 的单元行为覆盖。
+os.environ.setdefault("REPO_LUCENT_ANALYSIS_TTL", "3600")
 
 from repo_lucent.cli import (_setup, _build_argparser, _analyze,
                             invalidate_analysis_cache)

@@ -4,6 +4,84 @@
 版本语义：SCHEMA_VERSION 走 MAJOR.MINOR——MAJOR 破坏产物契约；MINOR 只增可选字段。
 TOOL_VERSION 与产物解耦，任意变更都可递增。
 
+## [Unreleased]
+
+去 VeroRun 硬编码 · 通用化改造（《RepoLucent 去 VeroRun 硬编码改造方案 v1》阶段 1-7 全量落地）。
+目标：把工具内所有对 VeroRun 的**隐式假设**（配置 / 结构 / 模板 / 品牌四层）上收为 profile 数据，
+使「换一个 profile 即可分析任意 Python 仓库」成立。
+**产物契约不变**（`SCHEMA_VERSION` 保持 1.4）。`TOOL_VERSION` **刻意不 bump**（仍 2.0.0），
+以保住「`--profile verorun` 产物与改造前逐字节一致」这一验收基线。
+
+### Changed（唯一行为变更）
+- **分析口径强制显式声明**：`profile` 不再回落到代码内置 VeroRun 常量。未通过
+  CLI `--profile` / 环境变量 `REPO_LUCENT_PROFILE` / `settings.profile.name` 三者之一声明时，
+  拒绝分析并以**退出码 2** 退出，提示可用预设（`ProfileNotDeclared` → `profile_error_exit()`）。
+- `--profile` 由子命令选项提升为**主解析器全局选项**——顺带修掉「全量分析无 `--repo-name` 时
+  profile 不生效」的既有缺陷，无需再用 `REPO_LUCENT_SETTINGS` 指向 profile 文件变通。
+- 新增环境变量 `REPO_LUCENT_HOME` 指定用户级基目录（默认 `~/.repolucent`）；
+  gitflow pack 的仓库组配置目录由 `~/.verorun` 迁至 `REPO_LUCENT_HOME`。
+
+### Added
+- **profile v2 字段**（全部只由配置层承载、不进产物 schema，故对 `verorun` 零行为漂移）：
+  `plugin_system`（插件体系识别口径）、`report_sections`（报告章节开关与文案）、
+  `gates.rules` + `gates.route_prefix_pattern`（支持的门禁项与路由前缀惯例）、
+  `packs.enabled`（pack 启用集）、`branding.title` / `branding.artifact_prefix`（品牌）。
+- `config.py` 新增配置层常量 `GATE_RULES` / `ROUTE_PREFIX_PATTERN` / `BRANDING`（由 `apply_profile()` 绑定）。
+- `gate.py` 新增 `GATE_GENERIC_RULES = ("file-too-large",)` 与 `active_rules()` / `active_rule_list()`：
+  未声明 `gates` 的 profile 只跑语言无关规则；`--fail-on` 显式点名不支持项 → 参数错（rc=2），
+  `--fail-on all` 静默收窄到 active 集。
+- `profiles/verorun.json`（新增，物化改造前的内置 VeroRun 口径）；`profiles/generic-python.json` /
+  `profiles/directory.json` 重写为 profile v2。
+- `tests/_boot.py`（新增）：verify 套件共用的「声明基线 profile」引导模块。
+
+### Added（代码统计 · MINOR）
+- `fs_scan.scan_overview` 新增字节量统计：`total_bytes`（全仓参与统计文件物理体积）、
+  `total_code_bytes`（代码扩展名文件物理体积）；`by_top_dir` / `top_files` / `by_language`
+  各条目新增 `bytes` 字段。口径基于 `os.stat.st_size`，与行数口径解耦，仅作体量参考。
+- **全量逐文件字节量数组 `files`**：`scan_overview` 返回新增 `files` 字段——每个被统计文件一条
+  `{file, bytes, lines, code}`（代码文件另含 `lines`/`code`，非代码文件二者为 0），满足「每个文件」层级查询。
+  `frontend_analyzer` 的 `overview.files` 同步透传前端仓逐文件字节量。所有渲染器保持 Top-N 展示，
+  仅数据层新增该数组。
+- 新增 `humanize_bytes(n)` 辅助函数（1024 进制 KB/MB/GB/TB）。
+- 报告渲染同步：Markdown（总览/按语言/按目录/最大文件/前端规模行）、HTML（指标卡 + 三张表）、
+  CLI 摘要（bytes_total/bytes_code/frontend_bytes）、AI_CONTEXT.md 前端规模行均展示字节量。
+- `frontend_analyzer.analyze_frontend` 的 overview 透传 `total_bytes` / `total_code_bytes`。
+
+### Changed（其余，均无语义变化）
+- L4 品牌层：`dashboard_view.py` 标题、`cli.py` deep-dive 产物前缀（`verorun_deep_` → `repolucent_deep_`）、
+  `--repo` / `--fail-on` / `repos add --profile` 帮助文案改为 profile 中性表述。
+- `packs/__init__.py`：删除代码内置 `DEFAULT_PACKS_BY_PROFILE`；`_FALLBACK_PACKS` 改为 `[]`；
+  `enabled_packs()` 优先级 = `settings.packs.enabled`（非 null）> `profile.packs.enabled` > `[]`。
+  **修复**：`_declared_packs()` 改用 `require_profile()`，使 `--profile` / `REPO_LUCENT_PROFILE`
+  通道声明的 pack 生效（此前仅 `settings.json` 通道生效）。
+- `server.py`：新增 `_effective_profile_name()`（经 `settings.active_profile_name()` 取权威值），
+  替换原先只读 `settings.json` 且硬编码 `verorun` 兜底的实现。
+- `ui/static/app.js`：移除硬编码 `'verorun'` 预设选中逻辑，未声明时提示改为「未声明」。
+- `repo_registry.py`：`profile=null` 语义改为「无内置默认，分析时按强制显式声明拒绝（rc=2）」。
+
+### Test
+- 测试按新契约适配：26 套 `verify_*.py`、`tests/conftest.py`（`run_cli` 注入
+  `REPO_LUCENT_PROFILE=verorun` 并清除 `REPO_LUCENT_SETTINGS`）、`tests/perf/test_budget.py`
+  （真实仓采集新增 `REPOLUCENT_PERF_PROFILE`，默认 `verorun`）。
+- `verify_profile.py` 重写：9 例（原 7 + `settings_profile_name_channel`、`unknown_profile_name_exits`）。
+- `verify_core_probe.py` 新增 `undeclared_profile_exits_2`（`settings.profile=null` → rc=2）。
+- 回归实测：**26 套 `verify_*` 全绿**；pytest `tests/unit` + `tests/perf` **77 例全绿**。
+- `tests/golden/*` **刻意不重录**（作为 VeroRun 基线保留）。
+
+### Notes
+- `tests/golden/*` 当前 4 例失败为**预存问题**，与本改造无关——已用改造前备份仓库复现完全相同的失败。
+  三个独立成因：① 快照陈旧（`meta.tool` 仍为旧名 `repolens`，且缺 v1.8.0 起的 `hotspots` 段）；
+  ② 快照行尾为 LF 而生成产物为 CRLF；③ `test_golden_stable_across_absolute_paths` 的
+  `copied_fixture` 未复制 `.git`，跨绝对路径比较时 `hotspots` 段有无不一致。
+  三者均属「快照 / 夹具维护」问题，非产品行为回归；是否重录留待用户决定。
+
+### Docs
+- `README.md`：快速开始示例补 `--profile`；新增「分析口径须显式声明」提示；packs 启用集语义改为
+  profile 驱动；性能采集命令补 `REPOLUCENT_PERF_PROFILE`。
+- `SETTINGS.md`：§1 设计原则「向后兼容」改为「显式声明优先」；§3.5 packs 表格改为 profile 驱动；
+  §5 `profile` 全章重写（声明通道与失败语义 / profile v2 字段全表 / 三预设 / 边界 / 与旧版等效性）；
+  §7.1 预设解析说明同步。
+
 ## [2.0.0] - 2026-09-13
 
 阶段 F 收口：规则引擎（`repo_lucent/rules/`），完成《repolucent升级实施方案 v1.5.1→v2.0.0》的最后一关，工具抵达 2.0.0 里程碑。

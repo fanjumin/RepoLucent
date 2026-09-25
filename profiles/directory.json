@@ -1,0 +1,40 @@
+{
+  "profile": {
+    "name": "directory",
+    "repo_signature": { "dirs": [], "files": [] },
+
+    "component": { "dir": "", "manifest": "" },
+    "core_modules": {},
+    "auto_core_exclude": [],
+    "exclude_dirs": null,
+    "root_entry_allowlist": [],
+    "key_docs": ["AGENTS.md", "README.md", "CHANGELOG.md", "GUIDE.md"],
+    "standard_doc_pattern": "",
+    "frontend_repo_names": [],
+
+    "plugin_system": { "enabled": false },
+
+    "report_sections": {
+      "plugin_contract": false,
+      "manifest_fields": false,
+      "interaction_conventions": false,
+      "architecture_redlines": true,
+      "boundary_rule": null,
+      "redlines": [
+        "本口径用于对仓库的**子目录范围**做单点洞察（项目成员范围统计）；",
+        "不假设任何组件/插件体系，组件相关章节一律省略；",
+        "操作前先方案后执行；对比/分析类指令只输出报告。"
+      ]
+    },
+
+    "default_gates": null,
+    "gates": { "rules": ["file-too-large"], "route_prefix_pattern": null },
+
+    "packs": { "enabled": [] },
+
+    "branding": {
+      "title": "目录洞察仪表盘",
+      "artifact_prefix": "repolucent_deep"
+    }
+  }
+}

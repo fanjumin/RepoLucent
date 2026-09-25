@@ -41,6 +41,23 @@ def count_lines(text: str) -> tuple[int, int]:
     return total, code
 
 
+def humanize_bytes(n: int) -> str:
+    """把字节数格式化为人类可读串（1024 进制，KB/MB/GB/TB/PB）。
+
+    与 count_lines 的行数口径解耦：字节量只看文件物理体积（os.stat.st_size），
+    不随行数/编码/注释口径变化，仅用于"仓库体量"量级参考。
+    """
+    n = int(n)
+    if n < 1024:
+        return f"{n} B"
+    size = float(n)
+    for unit in ("KB", "MB", "GB", "TB"):
+        size /= 1024.0
+        if size < 1024.0:
+            return f"{size:.1f} {unit}"
+    return f"{size:.1f} PB"
+
+
 #: 单文件读取上限（字节）。读取与哈希共用同一上限，保证「哈希内容 == 被解析内容」，
 #: 避免截断点之后的差异造成无意义的缓存失效。
 MAX_TEXT_BYTES = 2_000_000
@@ -134,17 +151,30 @@ def scan_overview(cfg: RepoConfig, parse_cache: dict | None = None) -> dict:
 
     parse_cache 传入时，.py 文件的行数直接复用 AST 解析结果，不再二次读取全文。
     两者的 LOC 口径一致（见 COUNT_LINE_COMMENT_PREFIXES），复用不改变任何统计值。
+
+    字节量（v2.0.0+）：基于文件 ``st_size`` 统计，与行数口径解耦——
+    ``total_bytes`` 为全仓参与统计文件（代码+资产）的字节总量，
+    ``total_code_bytes`` 为代码扩展名文件的字节总量；二者仅用于"仓库物理体积"量级参考，
+    不参与任何行数/比例计算。
+    ``files`` 为全量逐文件字节量数组（每个被统计文件一条，含 ``bytes``；代码文件另含 ``lines``/``code``），
+    满足"每个文件"层级查询。
     """
     by_top: dict[str, dict] = {}
     ext_counter: Counter[str] = Counter()
     code_by_ext: Counter[str] = Counter()
+    bytes_by_ext: Counter[str] = Counter()
     files_meta: list[dict] = []
     total_files = total_lines = total_code = total_assets = 0
+    total_bytes = total_code_bytes = 0
 
     for rel, fpath in iter_repo_files(cfg):
         top = rel.parts[0] if len(rel.parts) > 1 else "<root>"
         ext = fpath.suffix.lower()
         lines = code = 0
+        try:
+            size = fpath.stat().st_size
+        except OSError:
+            size = 0
         is_asset = False
         if ext in CODE_EXTS:
             entry = parse_cache.get(str(rel)) if parse_cache else None
@@ -155,42 +185,53 @@ def scan_overview(cfg: RepoConfig, parse_cache: dict | None = None) -> dict:
                 text = read_text_safe(fpath)
                 lines, code = count_lines(text)
             code_by_ext[ext] += code
+            bytes_by_ext[ext] += size
         elif ext in TEXT_ASSET_EXTS:
             is_asset = True  # 文档/文案/数据：计文件数，不计代码行
-        entry = by_top.setdefault(top, {"files": 0, "lines": 0, "code": 0, "exts": {}})
+        entry = by_top.setdefault(top, {"files": 0, "lines": 0, "code": 0, "bytes": 0, "exts": {}})
         entry["files"] += 1
         entry["lines"] += lines
         entry["code"] += code
+        entry["bytes"] += size
         entry["exts"][ext] = entry["exts"].get(ext, 0) + 1
         ext_counter[ext] += 1
         total_files += 1
         total_lines += lines
         total_code += code
+        total_bytes += size
         if is_asset:
             total_assets += 1
         elif ext in CODE_EXTS:
-            files_meta.append({"file": str(rel), "lines": lines, "code": code})
+            total_code_bytes += size
+        # 逐文件字节量：每个被统计文件都记录物理体积（st_size），与行数口径解耦。
+        # 代码文件另含 lines/code（非代码文件二者为 0），供「每个文件」层级查询。
+        files_meta.append({"file": str(rel), "bytes": size, "lines": lines, "code": code})
 
     return {
         "total_files": total_files,
         "total_asset_files": total_assets,
         "total_lines": total_lines,
         "total_code_lines": total_code,
+        "total_bytes": total_bytes,
+        "total_code_bytes": total_code_bytes,
         "code_scope_note": (
             "代码行统计口径：真实代码扩展名 "
             "(.py/.js/.ts/.vue/.html/.css/.sh/.sql)；已排除 docs/ 目录、根目录本地调试脚本、"
             "临时文件；.md/.yml/.json 等文档/文案仅计入资产文件数，不计代码行。"
+            "字节量为文件物理体积（st_size），与行数口径解耦，仅供体量参考。"
         ),
         "ext_distribution": dict(ext_counter.most_common(15)),
         "by_language": [
-            {"ext": ext, "files": ext_counter[ext], "code": code_by_ext[ext]}
+            {"ext": ext, "files": ext_counter[ext], "code": code_by_ext[ext], "bytes": bytes_by_ext[ext]}
             for ext in sorted(code_by_ext, key=lambda e: -code_by_ext[e])
         ],
         "by_top_dir": [
-            {"dir": d, "files": v["files"], "lines": v["lines"], "code": v["code"]}
+            {"dir": d, "files": v["files"], "lines": v["lines"], "code": v["code"], "bytes": v["bytes"]}
             for d, v in sorted(by_top.items(), key=lambda kv: -kv[1]["code"])
         ],
         "top_files": sorted(files_meta, key=lambda x: -x["code"])[:25],
+        # 全量逐文件字节量数组：每个被统计文件一条 {file, bytes, lines, code}
+        "files": files_meta,
     }
 
 
@@ -199,6 +240,19 @@ def render_tree(cfg: RepoConfig) -> str:
     root = cfg.repo_root
     lines = [root.name + "/"]
     depth = cfg.max_tree_depth
+
+    # 标记口径全部来自 profile.plugin_system；未启用时不做任何标记
+    # （改造前这里硬编码 "plugins" 与 9 个核心目录名，会把非该形态仓库的
+    #  同名目录误标为「核心」）。
+    _ps = config.PLUGIN_SYSTEM or {}
+    _labels = _ps.get("marker_labels") or {}
+    if config.plugin_system_enabled():
+        comp_dir = str(config.PLUGINS_DIR or "")
+        comp_label = str(_labels.get("component") or "组件")
+        core_label = str(_labels.get("core") or "核心")
+    else:
+        comp_dir, comp_label, core_label = "", "", ""
+    core_dir_names = set(_ps.get("core_dir_names") or [])
 
     def children(d: Path) -> list[Path]:
         out = []
@@ -222,11 +276,11 @@ def render_tree(cfg: RepoConfig) -> str:
             if is_dir:
                 n_py = sum(1 for c in p.rglob("*.py"))
                 mark = ""
-                if p.name == "plugins" or (d.name == "plugins" and not p.name.startswith("_")):
-                    mark = "  ← 插件"
-                elif p.name in ("plugin_manager", "orchestrator", "agent_matrix", "shared",
-                                 "admin", "main_site", "auth-center", "providers", "i18n"):
-                    mark = "  ← 核心"
+                if comp_dir and (p.name == comp_dir
+                                 or (d.name == comp_dir and not p.name.startswith("_"))):
+                    mark = f"  ← {comp_label}"
+                elif p.name in core_dir_names:
+                    mark = f"  ← {core_label}"
                 lines.append(f"{prefix}{branch}{p.name}/  ({n_py} .py){mark}")
                 if level < depth:
                     walk(p, prefix + ("    " if last else "│   "), level + 1)

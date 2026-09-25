@@ -28,6 +28,9 @@ os.environ.setdefault("PYTHONUNBUFFERED", "1")
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
+# 去 VeroRun 硬编码（阶段 7）：分析口径须显式声明，否则 _setup 直接报错退出。
+os.environ.setdefault("REPO_LUCENT_PROFILE", "verorun")
+
 from repo_lucent import cli  # noqa: E402
 from repo_lucent.server import _Handler, ThreadingHTTPServer  # noqa: E402
 

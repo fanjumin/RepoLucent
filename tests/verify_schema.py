@@ -32,6 +32,11 @@ os.environ.setdefault("PYTHONUNBUFFERED", "1")
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
+from _boot import use_baseline_profile                     # noqa: E402
+# 本套件进程内直接构造 RepoConfig 并调 cli._analyze（不经过 _setup），故必须
+# apply —— 否则 boundary_observations.rule 会是 None，违反产物 schema 的 string 契约。
+use_baseline_profile()
+
 from repo_lucent import cli                                     # noqa: E402
 from repo_lucent.config import RepoConfig                       # noqa: E402
 from repo_lucent.schema_check import (load_schema, validate,    # noqa: E402

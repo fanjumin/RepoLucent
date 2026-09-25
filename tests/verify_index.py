@@ -38,6 +38,9 @@ os.environ.setdefault("PYTHONUNBUFFERED", "1")
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
+from _boot import use_baseline_profile                     # noqa: E402
+use_baseline_profile()      # 阶段 7：口径须显式声明（见 tests/_boot.py）
+
 from repo_lucent import cli, index_db                             # noqa: E402
 from repo_lucent.config import RepoConfig                         # noqa: E402
 

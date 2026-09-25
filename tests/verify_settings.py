@@ -24,6 +24,10 @@ from types import SimpleNamespace
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
+# 去 VeroRun 硬编码（阶段 7）：分析口径须显式声明，否则 _setup 直接报错退出。
+# 本套件以随包 verorun 预设为基线口径（等价于改造前的"内置默认"）。
+os.environ.setdefault("REPO_LUCENT_PROFILE", "verorun")
+
 from repo_lucent.config import ToolConfig
 from repo_lucent.cli import _setup
 from repo_lucent.settings import load_settings, get_secret

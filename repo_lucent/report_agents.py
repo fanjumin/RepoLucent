@@ -24,6 +24,7 @@ import re
 from pathlib import Path
 
 from . import ARTIFACT_AGENTS_MD, TOOL_VERSION
+from . import report_text as rt
 
 #: 标记块。BEGIN/END 文本随当前品牌生成；**匹配**用下方品牌无关正则。
 BEGIN = "<!-- repolucent:begin auto（本块由 RepoLucent 生成，勿手改） -->"
@@ -90,10 +91,16 @@ def _route_prefix_stats(plugins: dict) -> list[tuple[str, int]]:
 
 
 def _gate_items() -> list[str]:
-    """可用门禁项清单（取自 gate 模块，单一事实源）。"""
+    """可用门禁项清单（= 当前 profile 支持项 + `all`，单一事实源取自 gate 模块）。
+
+    改造前这里直接列全局 GATE_CHOICES，会把 VeroRun 形态的门禁项（manifest 校验、
+    插件循环依赖、/admin 路由前缀）写到任何仓库的 AGENTS.md 里，误导使用者以为
+    这些检查对本仓库成立。
+    """
     try:
-        from .gate import GATE_CHOICES
-        return list(GATE_CHOICES)
+        from .gate import active_rule_list
+        items = active_rule_list()
+        return items + ["all"] if items else []
     except Exception:  # noqa: BLE001
         return []
 
@@ -148,7 +155,8 @@ def render_agents_block(data: dict, cfg=None) -> str:
         w(f"## {t['contract']}")
         w("")
         if bp:
-            w(f"`BasePlugin` (`{bp.get('file')}`)")
+            w(rt.fmt("agents_contract_base",
+                     **{**rt.plugin_ctx(), "base_file": bp.get("file") or ""}))
             w("")
             w("| method | required |")
             w("|---|---|")
@@ -244,10 +252,10 @@ def render_agents_block(data: dict, cfg=None) -> str:
         w("repolucent --repo <repo> --fail-on " + ",".join(dg or gate_items[:3]))
         w("")
     w("# 按需上下文切片（Agent 专用，不落盘）")
-    w("repolucent --repo <repo> context --for plugin:<identifier> --depth brief")
+    w(rt.text("agents_context_example"))
     w("")
     w("# 结构化查询与符号定位")
-    w("repolucent --repo <repo> query --select identifier,version --where agent_role=<role>")
+    w(rt.text("agents_query_example"))
     w("repolucent --repo <repo> search <symbol>")
     w("```")
     w("")

@@ -8,7 +8,7 @@ git 工作流（push/pull/sync/group/batch）与业务探针（store_probe/ssh_r
 
 覆盖矩阵：
   1) 可用的 pack 与登记一致，且目录存在
-  2) 内置 profile 的默认启用集（verorun → gitflow+verorun）
+  2) 随包 profile 自述的启用集（verorun 预设 → gitflow+verorun）
   3) settings.packs.enabled=[] → 纯只读内核；["gitflow"] → 仅该 pack
   4) 未知 pack 名被忽略（配置笔误不致命）
   5) 注册表聚合：内核 + pack == 拆分前条目全集（向后兼容硬断言）
@@ -38,6 +38,11 @@ from pathlib import Path
 os.environ.setdefault("PYTHONUNBUFFERED", "1")
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
+
+# 去 VeroRun 硬编码（阶段 7）：enable 集改由 profile.packs.enabled 自述，
+# 故必须显式声明口径，否则 enabled_packs() 落到"纯只读内核"（= []）。
+# 用例 10/13 依赖 verorun 预设启用 gitflow+verorun；用例 11/12 另行注入 settings 覆盖。
+os.environ.setdefault("REPO_LUCENT_PROFILE", "verorun")
 
 from repo_lucent import packs                                   # noqa: E402
 from repo_lucent.script_cmd import (_ALLOWED_PKGS, _load_core_registry,   # noqa: E402

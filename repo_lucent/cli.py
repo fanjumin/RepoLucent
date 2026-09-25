@@ -160,9 +160,12 @@ def _summary_pairs(data: dict, duration_ms: int) -> list[tuple]:
         ("files", ov["total_files"]),
         ("lines_total", ov["total_lines"]),
         ("lines_code", ov["total_code_lines"]),
+        ("bytes_total", ov.get("total_bytes", 0)),
+        ("bytes_code", ov.get("total_code_bytes", 0)),
         ("frontend_repos", len(fe)),
         ("frontend_files", sum(f["overview"]["total_files"] for f in fe)),
         ("frontend_code", sum(f["overview"]["total_code_lines"] for f in fe)),
+        ("frontend_bytes", sum(f["overview"].get("total_bytes", 0) for f in fe)),
         ("duration_ms", duration_ms),
     ]
     return pairs

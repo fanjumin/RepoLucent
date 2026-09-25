@@ -3,6 +3,8 @@
 from __future__ import annotations
 from collections import Counter
 
+from . import config
+
 
 def render_dashboard(d: dict) -> str:
     ov, core, plugins = d["overview"], d["core"], d["plugins"]
@@ -162,7 +164,7 @@ def render_dashboard(d: dict) -> str:
     html = f"""<!DOCTYPE html>
     <html lang="zh-CN"><head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>VeroRun AI 系统仪表盘 · v{ver}</title>
+    <title>{esc(config.BRANDING.get('title') or '仓库架构洞察仪表盘')} · v{ver}</title>
     <style>
     :root{{--bg:#f0f2f5;--card:#fff;--txt:#1f2329;--mut:#646a73;--line:#e5e6eb;--brand:#1677ff}}
     *{{box-sizing:border-box}}

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from . import TOOL_VERSION
+from . import report_text as rt
+from .fs_scan import humanize_bytes
 
 
 def _bar(n: int, width: int = 24) -> str:
@@ -33,6 +35,8 @@ def render_md(data: dict) -> str:
     w(f"| 业务插件（已识别） | {plugins['count']} 个 |")
     w(f"| Python 文件 | {ov['total_files']} 个（全仓文本文件口径） |")
     w(f"| 代码行 | {ov['total_code_lines']:,} 行 / 总 {ov['total_lines']:,} 行 |")
+    w(f"| 字节量 | {ov.get('total_bytes', 0):,} 字节（≈{humanize_bytes(ov.get('total_bytes', 0))}）· "
+      f"其中代码 {ov.get('total_code_bytes', 0):,} 字节（≈{humanize_bytes(ov.get('total_code_bytes', 0))}） |")
     w(f"| 插件路由总数 | {sum(p['route_count'] for p in plugins['items'])} 条 |")
     w(f"| manifest 校验失败插件 | {sum(1 for p in plugins['items'] if not p['manifest_valid'])} 个 |")
     w(f"| 核心边界观察项 | {len(inter['boundary_observations']['violations'])} 个 |")
@@ -44,24 +48,24 @@ def render_md(data: dict) -> str:
     w("")
     w("**按语言/扩展名（代码量 TOP）**")
     w("")
-    w("| 类型 | 代码行 | 文件数 |")
-    w("|---|---:|---:|")
+    w("| 类型 | 代码行 | 文件数 | 字节量 |")
+    w("|---|---:|---:|---:|")
     for e in ov.get("by_language", [])[:10]:
-        w(f"| `{e['ext'] or '(无)'}` | {e['code']:,} | {e['files']} |")
+        w(f"| `{e['ext'] or '(无)'}` | {e['code']:,} | {e['files']} | {e.get('bytes', 0):,}（{humanize_bytes(e.get('bytes', 0))}） |")
     w("")
     w("**按顶层目录（代码量 TOP）**")
     w("")
-    w("| 目录 | 代码行 | 总行 | 文件 |")
-    w("|---|---:|---:|---:|")
+    w("| 目录 | 代码行 | 总行 | 文件 | 字节量 |")
+    w("|---|---:|---:|---:|---:|")
     for e in ov.get("by_top_dir", [])[:14]:
-        w(f"| `{e['dir']}` | {e['code']:,} | {e['lines']:,} | {e['files']} |")
+        w(f"| `{e['dir']}` | {e['code']:,} | {e['lines']:,} | {e['files']} | {e.get('bytes', 0):,}（{humanize_bytes(e.get('bytes', 0))}） |")
     w("")
     w("**代码量最大文件 TOP 10**")
     w("")
-    w("| 文件 | 代码行 | 总行 |")
-    w("|---|---:|---:|")
+    w("| 文件 | 代码行 | 总行 | 字节量 |")
+    w("|---|---:|---:|---:|")
     for e in ov.get("top_files", [])[:10]:
-        w(f"| `{e['file']}` | {e['code']:,} | {e['lines']:,} |")
+        w(f"| `{e['file']}` | {e['code']:,} | {e['lines']:,} | {e.get('bytes', 0):,}（{humanize_bytes(e.get('bytes', 0))}） |")
     w("")
 
     w("## 2. 目录结构（深度 {}）".format(meta["tree_depth"]))
@@ -80,7 +84,8 @@ def render_md(data: dict) -> str:
             w(f"**{fe['root']}**（{fe['kind']}，v{p_['version']}）—— {p_['description']}")
             w("")
             w(f"- 技术栈：{('、'.join(fe['stack'])) or '—'}；构建版本：{('、'.join(fe['build_editions'])) or '—'}")
-            w(f"- 规模：{ov_['total_files']} 文件 · {ov_['total_code_lines']:,} 代码行（同一口径，主仓为 {data['overview']['total_code_lines']:,}）")
+            w(f"- 规模：{ov_['total_files']} 文件 · {ov_['total_code_lines']:,} 代码行（≈{humanize_bytes(ov_.get('total_code_bytes', 0))}）· "
+              f"字节量 {ov_.get('total_bytes', 0):,}（同一口径，主仓为 {data['overview']['total_code_lines']:,} 代码行）")
             w(f"- 结构：页面 {m_['pages']} · 组件 {m_['components']} · store {m_['stores']} · 服务模块 {m_['services']} · 主进程 TS {m_['electron_main_ts']} · 内嵌 Python {m_['native_py']}")
             w(f"- i18n：{('、'.join(m_['i18n_locales'])) or '—'} · 测试：单测 {m_['tests_unit']} / E2E {m_['tests_e2e']} · 工具脚本 {m_['tool_scripts']} 个")
             w(f"- 依赖：运行时 {p_['deps_count']} / 开发 {p_['dev_deps_count']} · npm scripts {p_['scripts_count']} 个"
@@ -107,70 +112,74 @@ def render_md(data: dict) -> str:
             w(f"| `{e['file']}` | {e['docstring'] or '—'} | {e['loc']} |")
         w("")
 
+    # 组件契约 / 组件目录：章节开关来自 profile.report_sections.plugin_contract。
+    # 改造前这四段（3.2~3.5）与第 4 节无条件按 VeroRun 口径输出。
     ps = core["plugin_system"]
-    if ps.get("base_plugin"):
-        bp = ps["base_plugin"]
-        w("### 3.2 插件开发契约：BasePlugin（{}）".format(bp["file"]))
-        w("")
-        if bp.get("docstring"):
-            w(f"> {bp['docstring']}")
+    if rt.section_enabled("plugin_contract"):
+        pctx = rt.plugin_ctx()
+        if ps.get("base_plugin"):
+            bp = ps["base_plugin"]
+            w(rt.fmt("md_contract_heading", **{**pctx, "base_file": bp["file"]}))
             w("")
-        w("所有插件必须继承 `plugin_manager.base.BasePlugin`：")
+            if bp.get("docstring"):
+                w(f"> {bp['docstring']}")
+                w("")
+            w(rt.fmt("md_contract_base_note",
+                     **{**pctx, "fqn": rt.fqn(bp["file"], pctx["base_class"])}))
+            w("")
+            w("| 方法 | 签名 | 必须 | 说明 |")
+            w("|---|---|---|---|")
+            for m in bp["methods"]:
+                must = "**是**" if m["abstract"] else ""
+                w(f"| `{m['name']}` | `{m['signature'][:70]}` | {must} | {m['docstring'] or '—'} |")
+            w("")
+            w(rt.fmt("md_contract_runtime_note", **pctx))
+            w("")
+
+        if ps.get("manager_api"):
+            ma = ps["manager_api"]
+            w(rt.fmt("md_manager_heading", **{**pctx, "manager_file": ma["file"]}))
+            w("")
+            w("| 方法 | 签名 |")
+            w("|---|---|")
+            for m in ma["methods"][:20]:
+                w(f"| `{m['name']}` | `{m['signature'][:80]}` |")
+            w("")
+
+        if ps.get("discovery_rules"):
+            w(rt.fmt("md_discovery_heading", **pctx))
+            w("")
+            for ln in ps["discovery_rules"]:
+                if ln.strip():
+                    w(f"- {ln.strip()}")
+            w("")
+
+        if ps.get("support_modules"):
+            w("### 3.5 插件框架支撑模块")
+            w("")
+            w("| 模块 | 说明 |")
+            w("|---|---|")
+            for s in ps["support_modules"]:
+                w(f"| `{s['module']}` | {s['docstring'] or '—'} |")
+            w("")
+
+        w("## 4. 业务插件目录（{} 个）".format(plugins["count"]))
         w("")
-        w("| 方法 | 签名 | 必须 | 说明 |")
-        w("|---|---|---|---|")
-        for m in bp["methods"]:
-            must = "**是**" if m["abstract"] else ""
-            w(f"| `{m['name']}` | `{m['signature'][:70]}` | {must} | {m['docstring'] or '—'} |")
-        w("")
-        w("运行时由 PluginManager 注入：`self.manager`（管理器）、`self.app`（Flask 应用）、"
-          "`self.plugin_info`（清单信息）、`self._log`（独立日志器）。")
+        w("| 插件 | 版本 | 角色 | 分类 | 路由 | LOC | BasePlugin | manifest |")
+        w("|---|---|---|---|---:|---:|---|---|")
+        for p in plugins["items"]:
+            has_cls = "✓" if p["plugin_classes"] else "✗"
+            ok = "✓" if p["manifest_valid"] else "✗ " + ";".join(p["manifest_errors"][:2])
+            w(f"| {p['identifier']} | {p['version'] or '—'} | {p['agent_role'] or '—'} | "
+              f"{p['category'] or '—'} | {p['route_count']} | {p['loc']:,} | {has_cls} | {ok} |")
         w("")
 
-    if ps.get("manager_api"):
-        ma = ps["manager_api"]
-        w("### 3.3 PluginManager 关键 API（{}）".format(ma["file"]))
-        w("")
-        w("| 方法 | 签名 |")
-        w("|---|---|")
-        for m in ma["methods"][:20]:
-            w(f"| `{m['name']}` | `{m['signature'][:80]}` |")
-        w("")
-
-    if ps.get("discovery_rules"):
-        w("### 3.4 插件发现规则（plugin_manager/discovery.py 原文）")
-        w("")
-        for ln in ps["discovery_rules"]:
-            if ln.strip():
-                w(f"- {ln.strip()}")
-        w("")
-
-    if ps.get("support_modules"):
-        w("### 3.5 插件框架支撑模块")
-        w("")
-        w("| 模块 | 说明 |")
-        w("|---|---|")
-        for s in ps["support_modules"]:
-            w(f"| `{s['module']}` | {s['docstring'] or '—'} |")
-        w("")
-
-    w("## 4. 业务插件目录（{} 个）".format(plugins["count"]))
-    w("")
-    w("| 插件 | 版本 | 角色 | 分类 | 路由 | LOC | BasePlugin | manifest |")
-    w("|---|---|---|---|---:|---:|---|---|")
-    for p in plugins["items"]:
-        has_cls = "✓" if p["plugin_classes"] else "✗"
-        ok = "✓" if p["manifest_valid"] else "✗ " + ";".join(p["manifest_errors"][:2])
-        w(f"| {p['identifier']} | {p['version'] or '—'} | {p['agent_role'] or '—'} | "
-          f"{p['category'] or '—'} | {p['route_count']} | {p['loc']:,} | {has_cls} | {ok} |")
-    w("")
-
-    if plugins["rejected_dirs"]:
-        w("### 4.1 未通过发现规则的目录")
-        w("")
-        for r in plugins["rejected_dirs"]:
-            w(f"- `{r['dir']}`：{'；'.join(r['reasons'])}")
-        w("")
+        if plugins["rejected_dirs"]:
+            w("### 4.1 未通过发现规则的目录")
+            w("")
+            for r in plugins["rejected_dirs"]:
+                w(f"- `{r['dir']}`：{'；'.join(r['reasons'])}")
+            w("")
 
     w("## 5. 核心与插件的交互")
     w("")
@@ -204,7 +213,10 @@ def render_md(data: dict) -> str:
     bo = inter["boundary_observations"]
     w("### 5.4 核心边界检查")
     w("")
-    w(f"检查规则：{bo['rule']}；共检查核心侧 {bo['checked_files']} 个 .py 文件。")
+    if bo.get("rule"):
+        w(f"检查规则：{bo['rule']}；共检查核心侧 {bo['checked_files']} 个 .py 文件。")
+    else:
+        w(f"共检查核心侧 {bo['checked_files']} 个 .py 文件。")
     w("")
     if bo["violations"]:
         w("| 文件 | 直接导入 |")
@@ -258,18 +270,22 @@ def render_md(data: dict) -> str:
     w("## 6. 开发规范摘要")
     w("")
     mr = std["manifest_required"]
-    w(f"**plugin.json 必填字段**（来源：{std['manifest_schema_file'] or '内置回退清单'}）：")
-    w("")
-    w("```")
-    w(", ".join(mr))
-    w("```")
-    w("")
-    if std.get("manifest_enums"):
-        w("**受控枚举**：")
+    if rt.section_enabled("manifest_fields"):
+        w(rt.fmt("md_manifest_heading",
+                 manifest_source=(std["manifest_schema_file"]
+                                  or rt.text("manifest_source_fallback")),
+                 **rt.plugin_ctx()))
         w("")
-        for field, values in std["manifest_enums"].items():
-            w(f"- `{field}`：{' / '.join(map(str, values))}")
+        w("```")
+        w(", ".join(mr))
+        w("```")
         w("")
+        if std.get("manifest_enums"):
+            w("**受控枚举**：")
+            w("")
+            for field, values in std["manifest_enums"].items():
+                w(f"- `{field}`：{' / '.join(map(str, values))}")
+            w("")
     if std.get("plugin_standard"):
         s = std["plugin_standard"]
         w(f"**插件标准**：[{s['title']}](docs/{s['file'].split('/')[-1]})，共 {len(s['sections'])} 章：")
@@ -303,16 +319,15 @@ def render_md(data: dict) -> str:
             w(f"| `{t['dir'].split('/')[-1]}` | {t['version'] or '—'} | {t['description'] or '—'} |")
         w("")
 
-    w("## 7. 新插件开发流程速览")
-    w("")
-    w("1. 复制 `plugins/_templates/react_plugin`（或 vue_plugin）到 `plugins/<identifier>/`；")
-    w(f"2. 编写 `plugin.json`：必填 {', '.join(mr)}；`agent_role` 必须取 11 个核心角色之一，`capabilities` 非空；")
-    w("3. 实现 BasePlugin 子类（`setup/activate/deactivate` 为抽象方法），运行时引用由 PluginManager 注入；")
-    w("4. 用 Flask Blueprint 暴露路由（参考现有插件 `url_prefix=/admin/<identifier>` 惯例）；")
-    w("5. 数据库统一走 `get_pooled_connection()` + 插件独立 schema，禁止私有连接池；")
-    w("6. 文案走插件自带 `i18n/*.yml` + `self.t()`，与系统 i18n 完全隔离；")
-    w("7. 运行本工具复核 manifest 校验与路由提取，再按 docs/plugin-standard 提交审核。")
-    w("")
+    # 开发流程速览：章节开关 workflow_guide；未声明时回落"是否启用组件体系"。
+    if rt.section_enabled("workflow_guide"):
+        w("## 7. 新插件开发流程速览")
+        w("")
+        for _i, _ln in enumerate(
+                rt.fmt_lines("workflow", manifest_required=", ".join(mr),
+                             **rt.plugin_ctx()), 1):
+            w(f"{_i}. {_ln}")
+        w("")
 
     if data.get("deep_dive"):
         dd = data["deep_dive"]

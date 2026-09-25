@@ -22,6 +22,10 @@ _PLUGIN_MOD_RE = re.compile(r"^plugins\.([a-z0-9_]+)")
 def analyze_interactions(cfg: RepoConfig, parse_cache: dict, core: dict, plugins: dict) -> dict:
     root = cfg.repo_root
     plugin_ids = {p["dir"] for p in plugins["items"]}
+    # 核心模块名集合 = profile 的核心知识库 ∪ 插件体系声明的核心目录名。
+    # 改造前这里硬编码 8 个额外目录名（且它们本就是 VeroRun 知识库的子集）。
+    core_names = set(config.KNOWN_CORE_MODULES) | set(
+        (config.PLUGIN_SYSTEM or {}).get("core_dir_names") or [])
 
     core_import_counter: Counter[str] = Counter()
     base_helper_counter: Counter[str] = Counter()
@@ -47,9 +51,7 @@ def analyze_interactions(cfg: RepoConfig, parse_cache: dict, core: dict, plugins
             parse_cache[str(rel)] = entry
             for m in entry["imports"]:
                 root_mod = m.split(".")[0]
-                if root_mod in config.KNOWN_CORE_MODULES or root_mod in (
-                        "plugin_manager", "orchestrator", "agent_matrix", "shared",
-                        "i18n", "providers", "admin", "main_site"):
+                if root_mod in core_names:
                     core_import_counter[root_mod] += 1
                 if m.startswith("plugins._base."):
                     base_helper_counter[m.split(".")[2]] += 1
@@ -61,12 +63,13 @@ def analyze_interactions(cfg: RepoConfig, parse_cache: dict, core: dict, plugins
 
     base_class_users = class_users  # 有 BasePlugin 子类的插件数
 
-    # 核心 → 插件 直接导入观察项（plugin_manager 的动态加载不算直接导入）
+    # 核心 → 插件 直接导入观察项（插件框架的动态加载不算直接导入）
+    core_dir = str((config.PLUGIN_SYSTEM or {}).get("core_dir") or "")
     plugin_manager_files = set()
-    for rel, _ in _iter_module_files(cfg, "plugin_manager"):
+    for rel, _ in _iter_module_files(cfg, core_dir):
         plugin_manager_files.add(str(rel))
     for mod in core["modules"]:
-        if mod["name"] == "plugin_manager":
+        if mod["name"] == core_dir:
             continue
         for rel, fpath in _iter_module_files(cfg, mod["name"]):
             entry = parse_cache.get(str(rel)) or parse_python_file(fpath, str(rel))
@@ -96,7 +99,7 @@ def analyze_interactions(cfg: RepoConfig, parse_cache: dict, core: dict, plugins
             "plugins_total": plugins["count"],
         },
         "boundary_observations": {
-            "rule": "核心模块不应直接 import 业务插件（plugin_manager 动态加载除外）",
+            "rule": (config.REPORT_SECTIONS or {}).get("boundary_rule"),
             "violations": core_to_plugin,
             "checked_files": sum(m["py_files"] for m in core["modules"]),
         },

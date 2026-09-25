@@ -32,6 +32,9 @@ os.environ.setdefault("PYTHONUNBUFFERED", "1")
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
+from _boot import use_baseline_profile                     # noqa: E402
+use_baseline_profile()      # 阶段 7：口径须显式声明（见 tests/_boot.py）
+
 TEST_HOME = Path(tempfile.mkdtemp(prefix="projreg_home_"))
 os.environ["REPO_LUCENT_HOME"] = str(TEST_HOME)
 
@@ -152,15 +155,22 @@ def main() -> int:
                f"dry={d5a.get('dry_run')} bad_scope_st={st5b} ok_st={st5c} raw={raw5c}")
 
         # ---- 6) analyze 成员级 e2e + profile 还原 ----
+        # 改造前这里断言 `_PROFILE_OVERRIDE is None`——那时它只在 --repo-name 通道
+        # 被填充。改造后 require_profile() 会把解析结果回填进 _PROFILE_OVERRIDE 作为
+        # 「单一事实源」，故它**本来就该非空**。真正要验的是：临时按成员口径覆盖之后，
+        # 生效口径已还原为请求前的那个（而非停在 'directory'）。
         from repo_lucent import settings as S
+        before_name = S.require_profile()[0]
         st6, d6, raw6 = req("POST", "/api/projects/analyze",
                             {"project": "P1", "member": "fixture", "only": "json"})
         s6 = d6.get("summary") or {}
+        after_name = S.require_profile()[0]
         ok6 = (st6 == 200 and s6.get("files", 0) > 0
-               and getattr(S, "_PROFILE_OVERRIDE", None) is None
+               and after_name == before_name
                and "projects" in str(d6.get("out_dir", "")))
         record("http_analyze_member_e2e", ok6,
-               f"st={st6} files={s6.get('files')} out={d6.get('out_dir')} raw={raw6}")
+               f"st={st6} files={s6.get('files')} profile_restored="
+               f"{before_name}->{after_name} out={d6.get('out_dir')} raw={raw6}")
 
         # ---- 7) analyze 子范围级 e2e ----
         st7, d7, raw7 = req("POST", "/api/projects/analyze",

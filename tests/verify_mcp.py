@@ -23,6 +23,10 @@ os.environ.setdefault("PYTHONUNBUFFERED", "1")
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
+# 阶段 7：口径须显式声明（见 tests/_boot.py）—— MCP stdio 子进程继承本进程环境。
+from _boot import use_baseline_profile                     # noqa: E402
+use_baseline_profile()
+
 from repo_lucent.scriptlib.subprocess_harness import (  # noqa: E402
     JsonRpcProc, has_result, has_error, expect_field,
 )

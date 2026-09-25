@@ -1,0 +1,143 @@
+{
+  "profile": {
+    "name": "verorun",
+    "repo_signature": { "dirs": ["plugins", "plugin_manager"], "files": [] },
+
+    "component": {
+      "dir": "plugins",
+      "manifest": "plugin.json",
+      "required_fields": ["identifier", "name", "version", "description",
+                          "author", "min_app_version", "agent_role", "capabilities"],
+      "id_pattern": "^[a-z0-9_]+$"
+    },
+
+    "core_modules": {
+      "plugin_manager": "插件框架：发现/加载/生命周期/Hooks/事件总线/技能注册/商店",
+      "orchestrator": "工作流编排引擎：DAG 节点、调度器、触发分发、安全求值",
+      "agent_matrix": "Agent 矩阵：系统核心角色（is_system=1）与能力聚合注册",
+      "admin": "管理后台服务（Flask 应用）：插件管理、商店、系统设置",
+      "main_site": "主站服务（Flask 应用）：门户页面与站点能力",
+      "auth-center": "认证中心：登录、会话、双因素、系统管理 API",
+      "health_service": "健康检查服务：部署自检与就绪探测",
+      "health_guardian": "守护进程：系统看护、完整性校验",
+      "providers": "Provider 接入层：LLM/模型/外部服务统一适配",
+      "shared": "共享基础设施：HTTP 客户端、日志、可观测性",
+      "i18n": "国际化：系统级翻译函数 _() 与语言管理",
+      "veroguard": "授权防护：许可证校验、防篡改（授权资产保护）",
+      "prompts": "系统提示词资源库",
+      "sdks": "对外 SDK",
+      "themes": "主题资源（design-system / themes.css）",
+      "templates": "服务端 Jinja2 页面模板",
+      "static": "静态资源"
+    },
+
+    "auto_core_exclude": ["docs", "deploy", "scripts", "tools"],
+    "exclude_dirs": null,
+    "root_entry_allowlist": ["auth_server.py", "health_guardian.py",
+                             "run_gunicorn.py", "run_auth_wsgi.py", "version.py"],
+    "key_docs": ["AGENTS.md", "GUIDE.md", "CHANGELOG.md", "README.md",
+                 "docs/developer-guide.md", "docs/plugin-standard-v1.7.md",
+                 "docs/plugin-manifest.schema.json", "docs/i18n-standard.md",
+                 "docs/official-api-security-spec.md"],
+    "standard_doc_pattern": "docs/plugin-standard-v*.md",
+    "frontend_repo_names": ["verorun-workplace"],
+    "default_gates": null,
+
+    "plugin_system": {
+      "enabled": true,
+      "core_dir": "plugin_manager",
+      "base_class": "BasePlugin",
+      "manager_class_pattern": "Manager",
+      "files": {
+        "base": "base.py",
+        "manager": "manager.py",
+        "discovery": "discovery.py",
+        "hooks": "hooks.py",
+        "event_bus": "event_bus.py"
+      },
+      "core_dir_names": ["plugin_manager", "orchestrator", "agent_matrix", "shared",
+                         "admin", "main_site", "auth-center", "providers", "i18n"],
+      "group_names": ["plugin_manager", "orchestrator", "agent_matrix", "shared",
+                      "i18n", "providers", "auth-center", "admin", "main_site",
+                      "health_service", "veroguard", "sdks"],
+      "marker_labels": { "component": "插件", "core": "核心" }
+    },
+
+    "report_sections": {
+      "plugin_contract": true,
+      "manifest_fields": true,
+      "interaction_conventions": true,
+      "architecture_redlines": true,
+      "workflow_guide": true,
+      "boundary_rule": "核心模块不应直接 import 业务插件（plugin_manager 动态加载除外）",
+
+      "manager_label": "PluginManager",
+
+      "ai_discovery_header": "发现规则（{discovery_source}）：",
+      "discovery_rule": "1. 插件位于 `{component_dir}/<identifier>/`；2. 必须含 `__init__.py`；3. 必须含合法 `{manifest}`；4. `_`/`.` 开头目录为框架资源，不是插件。",
+      "contract_base_note": "所有插件必须继承 `{base_class}`（{base_file}）：",
+      "contract_runtime_note": "运行时注入：`self.manager`（{manager_label}）、`self.app`（Flask app）、`self.plugin_info`、`self._log`；插件文案用 `self.t(text)`（插件自带 i18n/{locale}.yml）。",
+
+      "ai_manifest_heading": "## 3. {manifest} 必填字段",
+      "manifest_footnote": "版本号必须为 X.Y.Z 语义化版本；identifier 必须匹配 ^[a-z0-9_]+$。",
+      "manifest_source_fallback": "内置回退清单",
+      "md_manifest_heading": "**{manifest} 必填字段**（来源：{manifest_source}）：",
+      "html_manifest_heading": "<b>{manifest} 必填字段</b>",
+
+      "md_contract_heading": "### 3.2 插件开发契约：{base_class}（{base_file}）",
+      "md_contract_base_note": "所有插件必须继承 `{fqn}`：",
+      "md_contract_runtime_note": "运行时由 {manager_label} 注入：`self.manager`（管理器）、`self.app`（Flask 应用）、`self.plugin_info`（清单信息）、`self._log`（独立日志器）。",
+      "md_manager_heading": "### 3.3 {manager_label} 关键 API（{manager_file}）",
+      "md_discovery_heading": "### 3.4 插件发现规则（{discovery_source} 原文）",
+      "html_contract_heading": "<h2>插件开发契约 {base_class}</h2>",
+      "html_contract_note": "所有插件必须继承 {fqn}；运行时引用\n（self.manager / self.app / self.plugin_info / self._log）由 {manager_label} 注入。",
+
+      "agents_contract_base": "`{base_class}` (`{base_file}`)",
+      "agents_context_example": "repolucent --repo <repo> context --for plugin:<identifier> --depth brief",
+      "agents_query_example": "repolucent --repo <repo> query --select identifier,version --where agent_role=<role>",
+
+      "conventions": [
+        "路由：Flask Blueprint，惯例 `url_prefix=/admin/<identifier>`；",
+        "数据库：统一 `get_pooled_connection()` 共享连接池 + 插件独立 schema，禁止私有连接池；",
+        "Agent 注册：能力聚合到 `agent_role` 指定的系统核心角色（is_system=1），不新建独立 Agent；",
+        "依赖其他插件：写在 manifest `depends_on`；",
+        "辅助设施：`{component_dir}/_base/`（db / embeddings / ratelimit），直接导入使用。"
+      ],
+      "redlines": [
+        "新增文件必须使用项目现有目录结构与技术栈，禁止私建数据库/配置/连接池；",
+        "禁止手动 push 分发仓库，唯一合法来源是 CI 流水线；",
+        "操作前先方案后执行；对比/分析类指令只输出报告。"
+      ],
+      "workflow": [
+        "复制 `{component_dir}/_templates/react_plugin`（或 vue_plugin）到 `{component_dir}/<identifier>/`；",
+        "编写 `{manifest}`：必填 {manifest_required}；`agent_role` 必须取 11 个核心角色之一，`capabilities` 非空；",
+        "实现 {base_class} 子类（`setup/activate/deactivate` 为抽象方法），运行时引用由 {manager_label} 注入；",
+        "用 Flask Blueprint 暴露路由（参考现有插件 `url_prefix=/admin/<identifier>` 惯例）；",
+        "数据库统一走 `get_pooled_connection()` + 插件独立 schema，禁止私有连接池；",
+        "文案走插件自带 `i18n/*.yml` + `self.t()`，与系统 i18n 完全隔离；",
+        "运行本工具复核 manifest 校验与路由提取，再按 docs/plugin-standard 提交审核。"
+      ],
+      "html_workflow": [
+        "复制 <code>{component_dir}/_templates/react_plugin</code>（或 vue）到 <code>{component_dir}/&lt;identifier&gt;/</code>",
+        "编写 <code>{manifest}</code>（必填字段 + agent_role 枚举 + capabilities 非空）",
+        "实现 {base_class} 子类（setup / activate / deactivate 抽象方法）",
+        "Flask Blueprint 暴露路由，惯例 url_prefix=/admin/&lt;identifier&gt;",
+        "数据库走 get_pooled_connection() + 独立 schema；文案走插件 i18n + self.t()",
+        "运行本工具复核校验结果，再按 plugin-standard 提交审核"
+      ]
+    },
+
+    "gates": {
+      "rules": ["manifest-invalid", "boundary-violation", "plugin-cycle",
+                "route-unprefixed", "file-too-large", "findings"],
+      "route_prefix_pattern": "/admin/{identifier}"
+    },
+
+    "packs": { "enabled": ["gitflow", "verorun"] },
+
+    "branding": {
+      "title": "VeroRun AI 系统仪表盘",
+      "artifact_prefix": "verorun_deep"
+    }
+  }
+}

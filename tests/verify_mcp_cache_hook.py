@@ -17,6 +17,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
+from _boot import use_baseline_profile                     # noqa: E402
+use_baseline_profile()      # 阶段 7：口径须显式声明（见 tests/_boot.py）
+
 import repo_lucent.mcp.catalog as cat
 from repo_lucent import cli
 

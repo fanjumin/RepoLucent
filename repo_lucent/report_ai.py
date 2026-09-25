@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 from . import TOOL_VERSION
+from . import report_text as rt
 
 #: 各颗粒度下路由表的最大条数（brief 的目标是塞得进一次对话，故限制最紧）
 _ROUTE_CAP = {"brief": 20, "normal": 60, "full": 10 ** 6}
@@ -44,75 +45,85 @@ def render_ai_context(data: dict, max_plugins: int = 60) -> str:
     if fe:
         w("桌面端/前端仓库：" + "；".join(
             f"{f['root']}（{f['kind']} v{f['package']['version']}，"
-            f"{f['overview']['total_code_lines']:,} 代码行，页面 {f['metrics']['pages']}，"
+            f"{f['overview']['total_code_lines']:,} 代码行（≈{f['overview'].get('total_code_bytes', 0):,} 字节），"
+            f"页面 {f['metrics']['pages']}，"
             f"组件 {f['metrics']['components']}，i18n {'/'.join(f['metrics']['i18n_locales'])}）"
             for f in fe))
         w("")
     ps = core.get("plugin_system") or {}
     bp = ps.get("base_plugin")
-    w("## 2. 插件系统契约")
-    w("")
-    w("发现规则（plugin_manager/discovery.py）：")
-    w("")
-    w("1. 插件位于 `plugins/<identifier>/`；2. 必须含 `__init__.py`；"
-      "3. 必须含合法 `plugin.json`；4. `_`/`.` 开头目录为框架资源，不是插件。")
-    w("")
-    if bp:
-        w(f"所有插件必须继承 `BasePlugin`（{bp['file']}）：")
+    # 组件契约章节：开关来自 profile.report_sections.plugin_contract；
+    # 未声明时回落"是否启用组件体系"。非组件式仓库整节省略（改造前无条件输出）。
+    if rt.section_enabled("plugin_contract"):
+        pctx = rt.plugin_ctx()
+        w("## 2. 插件系统契约")
         w("")
-        for m in bp["methods"]:
-            tag = "**[必须实现]**" if m["abstract"] else "可选"
-            doc = (m["docstring"] or "").split("。")[0][:60]
-            w(f"- `{m['signature'].split('(')[0]}{m['signature'][m['signature'].find('('):][:50]}` — {tag} {doc}")
+        w(rt.fmt("ai_discovery_header", **pctx))
         w("")
-        w("运行时注入：`self.manager`（PluginManager）、`self.app`（Flask app）、"
-          "`self.plugin_info`、`self._log`；插件文案用 `self.t(text)`（插件自带 i18n/{locale}.yml）。")
+        w(rt.fmt("discovery_rule", **pctx))
+        w("")
+        if bp:
+            w(rt.fmt("contract_base_note", **{**pctx, "base_file": bp["file"]}))
+            w("")
+            for m in bp["methods"]:
+                tag = "**[必须实现]**" if m["abstract"] else "可选"
+                doc = (m["docstring"] or "").split("。")[0][:60]
+                w(f"- `{m['signature'].split('(')[0]}{m['signature'][m['signature'].find('('):][:50]}` — {tag} {doc}")
+            w("")
+            w(rt.fmt("contract_runtime_note", **pctx))
+            w("")
+    else:
+        w("## 2. 组件体系")
+        w("")
+        w(rt.text("no_component_note"))
         w("")
 
-    req = std["manifest_required"]
-    w("## 3. plugin.json 必填字段")
-    w("")
-    w("```")
-    w(", ".join(req))
-    w("```")
-    if std.get("manifest_enums"):
-        for k, v in std["manifest_enums"].items():
-            w(f"- `{k}` 枚举：{' / '.join(map(str, v))}")
-    w("")
-    w("版本号必须为 X.Y.Z 语义化版本；identifier 必须匹配 ^[a-z0-9_]+$。")
-    w("")
+    if rt.section_enabled("manifest_fields"):
+        req = std["manifest_required"]
+        w(rt.fmt("ai_manifest_heading", **rt.plugin_ctx()))
+        w("")
+        w("```")
+        w(", ".join(req))
+        w("```")
+        if std.get("manifest_enums"):
+            for k, v in std["manifest_enums"].items():
+                w(f"- `{k}` 枚举：{' / '.join(map(str, v))}")
+        w("")
+        w(rt.fmt("manifest_footnote", **rt.plugin_ctx()))
+        w("")
 
-    w("## 4. 现有插件清单（identifier | 版本 | 角色 | 路由数）")
-    w("")
-    w("| identifier | 版本 | 角色 | 路由 |")
-    w("|---|---|---|---:|")
-    for p in plugins["items"][:max_plugins]:
-        w(f"| {p['identifier']} | {p['version'] or '—'} | {p['agent_role'] or '—'} | {p['route_count']} |")
-    if len(plugins["items"]) > max_plugins:
-        w(f"| …（其余 {len(plugins['items']) - max_plugins} 个见完整报告） | | | |")
-    w("")
+    if rt.section_enabled("plugin_contract"):
+        w("## 4. 现有插件清单（identifier | 版本 | 角色 | 路由数）")
+        w("")
+        w("| identifier | 版本 | 角色 | 路由 |")
+        w("|---|---|---|---:|")
+        for p in plugins["items"][:max_plugins]:
+            w(f"| {p['identifier']} | {p['version'] or '—'} | {p['agent_role'] or '—'} | {p['route_count']} |")
+        if len(plugins["items"]) > max_plugins:
+            w(f"| …（其余 {len(plugins['items']) - max_plugins} 个见完整报告） | | | |")
+        w("")
 
-    w("## 5. 与核心交互的固定姿势")
-    w("")
-    w("- 路由：Flask Blueprint，惯例 `url_prefix=/admin/<identifier>`；")
-    w("- 数据库：统一 `get_pooled_connection()` 共享连接池 + 插件独立 schema，禁止私有连接池；")
-    w("- Agent 注册：能力聚合到 `agent_role` 指定的系统核心角色（is_system=1），不新建独立 Agent；")
-    w("- 依赖其他插件：写在 manifest `depends_on`；")
-    w("- 辅助设施：`plugins/_base/`（db / embeddings / ratelimit），直接导入使用。")
-    w("")
+    if rt.section_enabled("interaction_conventions"):
+        w("## 5. 与核心交互的固定姿势")
+        w("")
+        for ln in rt.fmt_lines("conventions", **rt.plugin_ctx()):
+            w("- " + ln)
+        w("")
     top_core = inter["plugins_import_core"][:6]
     if top_core:
         w("插件最常依赖的核心设施：" + "、".join(f"`{x['module']}`({x['import_count']})" for x in top_core))
         w("")
 
-    bo = inter["boundary_observations"]
-    w("## 6. 架构红线")
-    w("")
-    w(f"- {bo['rule']}；")
-    w("- 新增文件必须使用项目现有目录结构与技术栈，禁止私建数据库/配置/连接池；")
-    w("- 禁止手动 push 分发仓库，唯一合法来源是 CI 流水线；")
-    w("- 操作前先方案后执行；对比/分析类指令只输出报告。")
-    w("")
+    if rt.section_enabled("architecture_redlines"):
+        bo = inter["boundary_observations"]
+        w("## 6. 架构红线")
+        w("")
+        rule = bo.get("rule") or rt.text("boundary_rule")
+        if rule:
+            w(f"- {rule}；")
+        for ln in rt.fmt_lines("redlines", **rt.plugin_ctx()):
+            w("- " + ln)
+        w("")
     if std.get("plugin_standard"):
         s = std["plugin_standard"]
         w(f"## 7. 规范文档索引")

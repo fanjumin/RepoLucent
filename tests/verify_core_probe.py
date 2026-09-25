@@ -4,17 +4,24 @@
 
   1) settings 搜索链：REPO_LUCENT_SETTINGS 环境文件覆盖包内默认
   2) get_secret 新旧前缀别名回落
-  3) profile 按仓覆盖：generic-python → 组件短路；None → 内置 verorun 回落
+  3) profile 按仓覆盖：generic-python → 组件短路；显式点名 verorun → 基线口径
+  3b) 强制显式声明：三个声明通道全空 → exit 2（不再静默回落内置 VeroRun）
   4) ToolConfig.from_settings 注入 max_*
 """
 import json
 import os
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
+
+# 去 VeroRun 硬编码（阶段 7）：分析口径须显式声明（改造前"未声明即内置 verorun
+# 回落"已删除）。本套件以随包 verorun 预设为基线口径；用例 3b 会另行清空该通道
+# 以验证"真·未声明 → 退出码 2"。
+os.environ.setdefault("REPO_LUCENT_PROFILE", "verorun")
 
 results = []
 
@@ -64,11 +71,31 @@ def main() -> int:
     short = config.PLUGINS_DIR == "" and config.MANIFEST_NAME == ""
     empty = analyze_plugins(cfg, {})
     short = short and empty.get("count") == 0 and empty.get("items") == []
-    set_profile_override(None)                 # 回落内置
+    # 改造前这里是 set_profile_override(None) → 回落"内置 verorun"。
+    # 强制显式声明后已无内置回落，切回基线口径必须显式点名随包预设。
+    set_profile_override("verorun")
     config.apply_profile()
     back = (config.PLUGINS_DIR == "plugins" and config.MANIFEST_NAME == "plugin.json")
     record("profile_override_roundtrip", short and back,
-           f"short_circuit={short} builtin_restore={back}")
+           f"short_circuit={short} preset_restore={back}")
+
+    # ---- 3b) 强制显式声明：无任何声明 → exit 2 ----
+    # 用 settings 文件里的 profile:None 强制清空「用户级/项目级」声明通道，
+    # 再清掉环境变量与 --profile 通道，保证"真·未声明"可复现。
+    null_prof = Path(td) / "null_profile.json"
+    null_prof.write_text(json.dumps({"profile": None}), encoding="utf-8")
+    env = {k: v for k, v in os.environ.items() if k != "REPO_LUCENT_PROFILE"}
+    env["REPO_LUCENT_SETTINGS"] = str(null_prof)
+    r = subprocess.run(
+        [sys.executable, "-m", "repo_lucent",
+         "--repo", str(HERE / "tests" / "fixture_repo"),
+         "--out", str(Path(td) / "nodecl_out"), "--no-date-dir", "--no-cache"],
+        cwd=str(HERE), env=env, capture_output=True, text=True,
+        encoding="utf-8", errors="replace", timeout=300)
+    msg3 = (r.stdout or "") + (r.stderr or "")
+    ok3b = r.returncode == 2 and "未声明分析口径" in msg3
+    record("undeclared_profile_exits_2", ok3b,
+           f"exit={r.returncode} 提示={'未声明分析口径' in msg3}")
 
     # ---- 4) ToolConfig 注入 ----
     from repo_lucent.config import ToolConfig
