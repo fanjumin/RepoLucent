@@ -13,6 +13,18 @@ projects/
 *.log
 _openclaw-baseline-regress.log
 
+# Dashboard per-project analysis outputs (generated on this machine, never source)
+/CoffeeMachine/
+/FreshDemoApp/
+/Rover-Project-main/
+/RuView/
+/RuViewWeb/
+/SmartCoffee/
+/SmartCoffeeMachine/
+/VeroRun/
+/gaggiuino-release-nano-final-v4/
+/novasense/
+
 # ===== Cleanup archives (staging, not source) =====
 _archive_cleanup_*/
 
