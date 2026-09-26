@@ -13,7 +13,7 @@
 """
 
 TOOL_NAME = "repolucent"
-TOOL_VERSION = "2.1.0"
+TOOL_VERSION = "2.1.1"
 
 #: 产物 schema 版本（MAJOR.MINOR）—— 供人与 Agent 共同遵守的兼容契约。
 #:

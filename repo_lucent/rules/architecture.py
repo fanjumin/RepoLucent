@@ -80,19 +80,33 @@ def run_architecture(ctx: AnalysisContext) -> list[Finding]:
                     f"{name}() @L{lineno}"))
 
     # ARCH004 路由前缀未遵循 /admin/<identifier>
+    # v2.1.1 口径修正（三收窄，556 条虚高 → 每前缀一条的真偏离）：
+    #   ① 公开域豁免：url_prefix 不在 /admin 域 → 跳过（插件公开路由按设计
+    #      使用专属公开前缀，管理域惯例不适用，此前把 /mall、/api/* 全误伤）；
+    #   ② URL 连字符归一：/admin/site-builder ↔ site_builder 视为同一命名
+    #      （kebab-case URL 是常规风格选择，不是违规）；
+    #   ③ 蓝图级去重：按 (identifier, 前缀) 聚合报一条，此前逐路由重复计数。
     plugins = (data.get("plugins") or {}).get("items") or []
+    reported4: set[tuple[str, str]] = set()
     for p in plugins:
         ident = p.get("identifier", "")
         allowed = {f"/admin/{ident}", f"/admin/{p.get('dir', ident)}"}
         for r in (p.get("routes") or []):
             prefix = (r.get("url_prefix") or "").strip().strip("\"'")
-            if not prefix.startswith("/"):
-                continue
-            if prefix.rstrip("/") in allowed:
-                continue
+            if not prefix.startswith("/admin"):
+                continue                            # ① 公开域 / 空前缀 / 动态值豁免
+            norm = "/" + "/".join(seg.replace("-", "_")
+                                  for seg in prefix.strip("/").split("/"))
+            if any(norm.rstrip("/") == a or norm.startswith(a + "/")
+                   for a in allowed):
+                continue                            # ② 归一后同源（含本域子路径）
+            dkey = (ident, norm)
+            if dkey in reported4:
+                continue                            # ③ 每前缀只报一条
+            reported4.add(dkey)
             findings.append(Finding(
                 "ARCH004", SEVERITY_WARNING, "architecture", ident,
                 r.get("file"), None,
-                f"{r.get('endpoint', '?')} 的 url_prefix={prefix or '(空)'} 未遵循 /admin/<identifier>",
-                f"期望 {sorted(allowed)[0]}"))
+                f"管理域前缀 url_prefix={prefix or '(空)'} 未遵循 /admin/<identifier>",
+                f"期望 {sorted(allowed)[0]}（同前缀路由已聚合）"))
     return findings

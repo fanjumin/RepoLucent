@@ -2,7 +2,7 @@
   "meta": {
     "schema_version": "1.5",
     "tool": "repolucent",
-    "tool_version": "2.1.0",
+    "tool_version": "2.1.1",
     "generated_at": null,
     "repo_root": "fixture_repo",
     "tree_depth": 2,
@@ -668,21 +668,11 @@
   "findings": {
     "schema_version": "1.0",
     "summary": {
-      "error": 3,
+      "error": 2,
       "warning": 4,
       "info": 0
     },
     "items": [
-      {
-        "rule_id": "SPEC001",
-        "severity": "error",
-        "category": "spec",
-        "target": "demo",
-        "file": null,
-        "line": null,
-        "message": "agent_role='business' 不在核心角色集合",
-        "evidence": "agent_role='business'"
-      },
       {
         "rule_id": "SPEC002",
         "severity": "error",

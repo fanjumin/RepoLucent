@@ -82,6 +82,23 @@ TOOL_VERSION 与产物解耦，任意变更都可递增。
   §5 `profile` 全章重写（声明通道与失败语义 / profile v2 字段全表 / 三预设 / 边界 / 与旧版等效性）；
   §7.1 预设解析说明同步。
 
+### Fixed（规则口径修正 · TOOL_VERSION 2.1.0 → 2.1.1）
+- **SPEC001 角色集合去硬编码**（真实仓 40/40 全量误报暴露的问题）：原内核内置
+  {chat, assistant, …} 与项目实际角色表脱节。现读 `profile.agent_roles`
+  （`from_glob` + `name_strip`，VeroRun 即 `agent_matrix/roles/*.yaml`）；
+  **未声明 / 角色源解析为空 → 规则整体跳过**（对齐 `route_prefix_pattern=None`
+  即跳过的既有语义：宁可不判，不臆判）。
+- **ARCH004 三收窄**（真实仓 556 条虚高）：公开域前缀豁免（插件公开路由按设计
+  不走 `/admin`，此前 `/mall`、`/api/*` 全误伤）；URL 连字符归一
+  （`/admin/site-builder` ↔ `site_builder` 属命名风格，不算违规）；按
+  `(identifier, 前缀)` 聚合一条（此前逐路由重复计数）。
+- `profiles/verorun.json`：`auto_core_exclude` 增加 `_ssh`（本地调试脚本目录被
+  误判为"核心模块"致 ARCH001/边界越权 15 条误报）。
+- `verify_rules.py`：case2 角色源改临时仓内权威源；新增「无声明即跳过」与
+  「ARCH004 豁免+聚合」两条口径断言。
+- 数据不变、语义修正：`SCHEMA_VERSION` 维持 1.5；findings 条目文本/数量变化
+  随 golden 重录。
+
 ## [2.1.0] - 2026-09-26
 
 端点全景归链（Electron 接线数据源）：把「逐路由可复现的完整端点目录」上收为工具事实。

@@ -31,8 +31,13 @@
       "static": "静态资源"
     },
 
-    "auto_core_exclude": ["docs", "deploy", "scripts", "tools"],
+    "auto_core_exclude": ["docs", "deploy", "scripts", "tools", "_ssh"],
     "exclude_dirs": null,
+    "agent_roles": {
+      "from_glob": "agent_matrix/roles/*.yaml",
+      "name_strip": "^\\d+-(.+)$",
+      "_comment": "SPEC001 角色权威源：仓内角色表文件名（01-athena.yaml → athena）。"
+    },
     "root_entry_allowlist": ["auth_server.py", "health_guardian.py",
                              "run_gunicorn.py", "run_auth_wsgi.py", "version.py"],
     "key_docs": ["AGENTS.md", "GUIDE.md", "CHANGELOG.md", "README.md",

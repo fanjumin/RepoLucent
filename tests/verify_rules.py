@@ -52,8 +52,14 @@ def main() -> int:
         },
         "overview": {"top_files": [{"file": "huge.py", "code": 99999, "lines": 99999}]},
     }
-    # HERE 无 plugins 目录 → AST 规则空；仅数据派生规则命中
-    cfg = RepoConfig(repo_root=HERE, out_dir=Path(tempfile.mkdtemp(prefix="vr_")))
+    # v2.1.1：SPEC001 角色集合改读 profile.agent_roles 的仓内权威源——
+    # 临时根造角色表（01-athena.yaml → athena），weird_role 应命中；
+    # 无 plugins 目录 → AST 规则空，仅数据派生规则命中。
+    rr = Path(tempfile.mkdtemp(prefix="vr_roles_"))
+    (rr / "agent_matrix" / "roles").mkdir(parents=True)
+    (rr / "agent_matrix" / "roles" / "01-athena.yaml").write_text(
+        "name: athena\n", encoding="utf-8")
+    cfg = RepoConfig(repo_root=rr, out_dir=Path(tempfile.mkdtemp(prefix="vr_")))
     fr = run_rules(data, cfg)
     ids = {f["rule_id"] for f in fr["items"]}
     expect = {"SPEC001", "SPEC002", "SPEC003", "SPEC004", "SPEC005",
@@ -131,6 +137,50 @@ def main() -> int:
         record("rules_real_repo", ok5, f"summary={s} items={n}")
     else:
         record("rules_real_repo", True, "SKIPPED: 未设置 REPOLUCENT_REAL_REPO")
+
+    # ---- 6) v2.1.1 SPEC001 口径：profile 未声明 agent_roles → 整条规则跳过 ----
+    from repo_lucent import config as _cfg_mod, settings as _set_mod
+    _set_mod.set_profile_override({"name": "vr-no-roles",
+                                   "repo_signature": {"dirs": [], "files": []}})
+    _cfg_mod.apply_profile()
+    fr6 = run_rules(data, cfg)          # 同 case2 输入：有角色表但无 agent_roles 声明
+    n6 = sum(1 for f in fr6["items"] if f["rule_id"] == "SPEC001")
+    record("spec001_skipped_without_declaration", n6 == 0, f"SPEC001={n6}")
+    _set_mod.set_profile_override("verorun")   # 恢复基线口径
+    _cfg_mod.apply_profile()
+
+    # ---- 7) v2.1.1 ARCH004 三收窄：公开域豁免 / 连字符归一 / 每前缀聚合一条 ----
+    data7 = {
+        "plugins": {"items": [{
+            "identifier": "site_builder", "dir": "site_builder",
+            "agent_role": "", "capabilities": ["x"], "version": "1.0.0",
+            "min_app_version": "", "i18n_locales": ["zh"],
+            "docs": {"readme": "README.md"},
+            "routes": [
+                {"url_prefix": "'/mall'", "endpoint": "a",
+                 "file": "plugins/site_builder/public.py"},
+                {"url_prefix": "'/mall'", "endpoint": "b",
+                 "file": "plugins/site_builder/public.py"},
+                {"url_prefix": "'/admin/site-builder'", "endpoint": "c",
+                 "file": "plugins/site_builder/routes.py"},
+                {"url_prefix": "'/admin/site-builder/mini-app/publish'",
+                 "endpoint": "d", "file": "plugins/site_builder/routes.py"},
+                {"url_prefix": "'/admin/wrong-name'", "endpoint": "e",
+                 "file": "plugins/site_builder/routes.py"},
+                {"url_prefix": "'/admin/wrong-name'", "endpoint": "f",
+                 "file": "plugins/site_builder/routes.py"},
+            ],
+        }]},
+        "interactions": {"boundary_observations": {"violations": []},
+                         "plugin_to_plugin": []},
+        "overview": {"top_files": []},
+    }
+    cfg7 = RepoConfig(repo_root=Path(tempfile.mkdtemp(prefix="vr7_")),
+                      out_dir=Path(tempfile.mkdtemp(prefix="vr7o_")))
+    a7 = [f for f in run_rules(data7, cfg7)["items"] if f["rule_id"] == "ARCH004"]
+    ok7 = len(a7) == 1 and "wrong-name" in a7[0]["message"]
+    record("arch004_public_exempt_dedup", ok7,
+           f"n={len(a7)} msgs={[f['message'] for f in a7]}")
 
     failed = [r["case"] for r in results if not r["ok"]]
     print(f"\nRESULT: {len(results) - len(failed)}/{len(results)} passed"

@@ -1,6 +1,6 @@
 # 仓库架构洞察报告（RepoLucent）
 
-> 由 RepoLucent v2.1.0 自动生成 · None · 仓库 `fixture_repo` · 耗时 None ms
+> 由 RepoLucent v2.1.1 自动生成 · None · 仓库 `fixture_repo` · 耗时 None ms
 
 ## 1. 总览
 
@@ -174,12 +174,10 @@ identifier, name, version, description, author, min_app_version, agent_role, cap
 
 | 级别 | 数量 |
 | --- | --- |
-| error | 3 |
+| error | 2 |
 | warning | 4 |
 | info | 0 |
 
-- **[error] SPEC001** `demo`: agent_role='business' 不在核心角色集合
-  - 证据: agent_role='business'
 - **[error] SPEC002** `Bad-Id`: capabilities 为空
   - 证据: capabilities=[]
 - **[error] SPEC005** `Bad-Id`: version='1.0' 不符合 X.Y.Z 语义化版本
