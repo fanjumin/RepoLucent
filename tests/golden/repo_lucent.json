@@ -1,8 +1,8 @@
 {
   "meta": {
-    "schema_version": "1.4",
+    "schema_version": "1.5",
     "tool": "repolucent",
-    "tool_version": "2.0.0",
+    "tool_version": "2.1.0",
     "generated_at": null,
     "repo_root": "fixture_repo",
     "tree_depth": 2,
@@ -14,7 +14,9 @@
     "total_asset_files": 3,
     "total_lines": 60,
     "total_code_lines": 53,
-    "code_scope_note": "代码行统计口径：真实代码扩展名 (.py/.js/.ts/.vue/.html/.css/.sh/.sql)；已排除 docs/ 目录、根目录本地调试脚本、临时文件；.md/.yml/.json 等文档/文案仅计入资产文件数，不计代码行。",
+    "total_bytes": 1872,
+    "total_code_bytes": 1528,
+    "code_scope_note": "代码行统计口径：真实代码扩展名 (.py/.js/.ts/.vue/.html/.css/.sh/.sql)；已排除 docs/ 目录、根目录本地调试脚本、临时文件；.md/.yml/.json 等文档/文案仅计入资产文件数，不计代码行。字节量为文件物理体积（st_size），与行数口径解耦，仅供体量参考。",
     "ext_distribution": {
       ".py": 10,
       ".json": 2,
@@ -24,7 +26,8 @@
       {
         "ext": ".py",
         "files": 10,
-        "code": 53
+        "code": 53,
+        "bytes": 1528
       }
     ],
     "by_top_dir": [
@@ -32,83 +35,196 @@
         "dir": "plugin_manager",
         "files": 3,
         "lines": 34,
-        "code": 31
+        "code": 31,
+        "bytes": 942
       },
       {
         "dir": "plugins",
         "files": 7,
         "lines": 22,
-        "code": 18
+        "code": 18,
+        "bytes": 800
       },
       {
         "dir": "i18n",
         "files": 1,
         "lines": 2,
-        "code": 2
+        "code": 2,
+        "bytes": 25
       },
       {
         "dir": "shared",
         "files": 1,
         "lines": 2,
-        "code": 2
+        "code": 2,
+        "bytes": 32
       },
       {
         "dir": "<root>",
         "files": 1,
         "lines": 0,
-        "code": 0
+        "code": 0,
+        "bytes": 73
       }
     ],
     "top_files": [
       {
         "file": "plugin_manager\\base.py",
+        "bytes": 570,
         "lines": 21,
         "code": 19
       },
       {
         "file": "plugins\\demo\\routes.py",
+        "bytes": 242,
         "lines": 10,
         "code": 8
       },
       {
         "file": "plugin_manager\\discovery.py",
+        "bytes": 200,
         "lines": 7,
         "code": 7
       },
       {
         "file": "plugins\\demo\\__init__.py",
+        "bytes": 183,
         "lines": 7,
         "code": 6
       },
       {
         "file": "plugin_manager\\manager.py",
+        "bytes": 172,
         "lines": 6,
         "code": 5
       },
       {
         "file": "i18n\\__init__.py",
+        "bytes": 25,
         "lines": 2,
         "code": 2
       },
       {
         "file": "plugins\\_base\\db.py",
+        "bytes": 47,
         "lines": 2,
         "code": 2
       },
       {
         "file": "plugins\\bad\\__init__.py",
+        "bytes": 28,
         "lines": 2,
         "code": 2
       },
       {
         "file": "shared\\__init__.py",
+        "bytes": 32,
         "lines": 2,
         "code": 2
       },
       {
+        "file": "AGENTS.md",
+        "bytes": 73,
+        "lines": 0,
+        "code": 0
+      },
+      {
         "file": "plugins\\__init__.py",
+        "bytes": 29,
         "lines": 1,
         "code": 0
+      },
+      {
+        "file": "plugins\\bad\\plugin.json",
+        "bytes": 57,
+        "lines": 0,
+        "code": 0
+      },
+      {
+        "file": "plugins\\demo\\plugin.json",
+        "bytes": 214,
+        "lines": 0,
+        "code": 0
+      }
+    ],
+    "files": [
+      {
+        "file": "AGENTS.md",
+        "bytes": 73,
+        "lines": 0,
+        "code": 0
+      },
+      {
+        "file": "i18n\\__init__.py",
+        "bytes": 25,
+        "lines": 2,
+        "code": 2
+      },
+      {
+        "file": "plugin_manager\\base.py",
+        "bytes": 570,
+        "lines": 21,
+        "code": 19
+      },
+      {
+        "file": "plugin_manager\\discovery.py",
+        "bytes": 200,
+        "lines": 7,
+        "code": 7
+      },
+      {
+        "file": "plugin_manager\\manager.py",
+        "bytes": 172,
+        "lines": 6,
+        "code": 5
+      },
+      {
+        "file": "plugins\\__init__.py",
+        "bytes": 29,
+        "lines": 1,
+        "code": 0
+      },
+      {
+        "file": "plugins\\_base\\db.py",
+        "bytes": 47,
+        "lines": 2,
+        "code": 2
+      },
+      {
+        "file": "plugins\\bad\\__init__.py",
+        "bytes": 28,
+        "lines": 2,
+        "code": 2
+      },
+      {
+        "file": "plugins\\bad\\plugin.json",
+        "bytes": 57,
+        "lines": 0,
+        "code": 0
+      },
+      {
+        "file": "plugins\\demo\\__init__.py",
+        "bytes": 183,
+        "lines": 7,
+        "code": 6
+      },
+      {
+        "file": "plugins\\demo\\plugin.json",
+        "bytes": 214,
+        "lines": 0,
+        "code": 0
+      },
+      {
+        "file": "plugins\\demo\\routes.py",
+        "bytes": 242,
+        "lines": 10,
+        "code": 8
+      },
+      {
+        "file": "shared\\__init__.py",
+        "bytes": 32,
+        "lines": 2,
+        "code": 2
       }
     ]
   },
@@ -400,6 +516,7 @@
             "var": "demo_bp",
             "name": "'demo'",
             "url_prefix": "'/admin/demo'",
+            "prefix_literal": true,
             "file": "plugins\\demo\\routes.py"
           }
         ],
@@ -414,7 +531,15 @@
             ],
             "endpoint": "ping",
             "lineno": 5,
-            "file": "plugins\\demo\\routes.py"
+            "via": "route",
+            "purpose": null,
+            "owner_is_param": false,
+            "registrar": null,
+            "file": "plugins\\demo\\routes.py",
+            "bp_name": "demo",
+            "prefix": "/admin/demo",
+            "path": "/admin/demo/ping",
+            "resolution": "blueprint"
           },
           {
             "bp": "demo_bp",
@@ -425,7 +550,15 @@
             ],
             "endpoint": "list_items",
             "lineno": 9,
-            "file": "plugins\\demo\\routes.py"
+            "via": "route",
+            "purpose": null,
+            "owner_is_param": false,
+            "registrar": null,
+            "file": "plugins\\demo\\routes.py",
+            "bp_name": "demo",
+            "prefix": "/admin/demo",
+            "path": "/admin/demo/list",
+            "resolution": "blueprint"
           }
         ],
         "route_count": 2,

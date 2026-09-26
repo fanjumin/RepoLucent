@@ -14,6 +14,11 @@ Windows spawn 三条铁律全部满足：worker 为顶层函数；只接收 (绝
 负载）；入口 `repolucent.py` / `repo_lucent/__main__.py` 均具备
 `if __name__ == "__main__"` 守卫。并行侧任何异常都自动串行兜底——优化可以失效，
 正确性不可以。
+
+v2.1.0（端点全景）：路由采集面扩展——get/post 简写装饰器、add_url_rule 调用、
+处理函数 docstring（purpose）、注册器形态标志（owner_is_param）、单 Name 实参
+调用点（calls1，供 endpoint_resolver 归链跨文件/形参蓝图）。AST 缓存 entry
+结构变化，CACHE_VERSION 同步 4→5。既有字段语义与格式不变。
 """
 from __future__ import annotations
 
@@ -104,10 +109,38 @@ def _is_abstract(node) -> bool:
     return False
 
 
+#: Flask/FastAPI 风格的简写路由装饰器（v2.1.0）
+_HTTP_METHODS = frozenset({"get", "post", "put", "delete", "patch", "head", "options"})
+
+#: 应用级对象的常见变量名——简写装饰器 owner 白名单（保守：仅这些 + 本文件蓝图变量）
+_APP_LIKE_OWNERS = frozenset({"app", "router", "api", "server"})
+
+
 def _extract_routes(tree: ast.Module) -> tuple[list[dict], list[dict]]:
-    """提取 Flask Blueprint 定义与 @<var>.route(...) 路由声明。"""
+    """提取 Flask Blueprint 定义与路由声明。
+
+    v2.1.0 端点全景增强（消费方=endpoint_resolver.py，字段为 MINOR 新增）：
+    - `via`：route 装饰器 / get·post 等简写装饰器 / add_url_rule 三种形态统一采集；
+    - `purpose`：路由处理函数 docstring 首行（无则 None，不臆测）；
+    - `owner_is_param`：owner 是否为所在函数形参（`def register_routes(bp): @bp.route`
+      注册器形态的识别标志，前缀由仓库级 resolver 按调用点实参归链）；
+    - blueprint 补 `prefix_literal`：url_prefix 是否字符串字面量（区分「无前缀」与
+      「前缀是变量引用、静态不可定」）。
+    既有字段（bp/url_prefix/rule/methods/endpoint/lineno）语义与取值格式**不变**
+    （rule/url_prefix 仍为 ast.unparse 文本，字符串常量带引号——gate.py 等消费方
+    已按此口径处理）。
+    """
     blueprints: list[dict] = []
     routes: list[dict] = []
+
+    def _is_str_const(node) -> bool:
+        return isinstance(node, ast.Constant) and isinstance(node.value, str)
+
+    def _methods_of(seq) -> list[str] | None:
+        if isinstance(seq, (ast.List, ast.Tuple)):
+            return [e.value.upper() for e in seq.elts
+                    if isinstance(e, ast.Constant) and isinstance(e.value, str)]
+        return None
 
     for node in ast.walk(tree):
         # x = Blueprint("name", __name__, url_prefix=...)
@@ -119,13 +152,17 @@ def _extract_routes(tree: ast.Module) -> tuple[list[dict], list[dict]]:
                 is_bp = (isinstance(fn, ast.Name) and fn.id == "Blueprint") or \
                         (isinstance(fn, ast.Attribute) and fn.attr == "Blueprint")
                 if is_bp:
-                    bp = {"var": node.targets[0].id, "name": "", "url_prefix": ""}
+                    bp = {"var": node.targets[0].id, "name": "", "url_prefix": "",
+                          "prefix_literal": True}
                     if val.args:
                         bp["name"] = _up(val.args[0])
                     for kw in val.keywords:
                         if kw.arg == "url_prefix":
                             bp["url_prefix"] = _up(kw.value)
+                            bp["prefix_literal"] = _is_str_const(kw.value)
                     blueprints.append(bp)
+
+    bp_vars = {b["var"] for b in blueprints}
 
     def bp_prefix(var: str) -> str:
         for b in blueprints:
@@ -133,32 +170,108 @@ def _extract_routes(tree: ast.Module) -> tuple[list[dict], list[dict]]:
                 return b["url_prefix"]
         return ""
 
+    def _walk_funcs(node: ast.AST, outer_params: frozenset[str],
+                    param_src: dict[str, str]) -> None:
+        """按作用域递归遍历函数节点：外层形参名向下累积。
+
+        注册器形态 `def register_routes(bp): @bp.route(...)` 的路由处理函数是
+        **嵌套**函数，`bp` 是外层函数形参——owner_is_param 判定必须看到外层作用域；
+        `registrar` 记录引入该形参的函数名，供 endpoint_resolver 按调用点实参归链。
+        """
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                own = {a.arg for a in
+                       list(getattr(child.args, "posonlyargs", []) or [])
+                       + child.args.args + child.args.kwonlyargs}
+                params = outer_params | own
+                src = dict(param_src)
+                for a in own - outer_params:
+                    src[a] = child.name
+                for dec in child.decorator_list:
+                    if not (isinstance(dec, ast.Call)
+                            and isinstance(dec.func, ast.Attribute)):
+                        continue
+                    if not isinstance(dec.func.value, ast.Name):
+                        continue
+                    owner = dec.func.value.id
+                    attr = dec.func.attr
+                    if attr == "route":
+                        via, methods = "route", ["GET"]
+                    elif attr in _HTTP_METHODS and (owner in bp_vars
+                                                    or owner in _APP_LIKE_OWNERS):
+                        via, methods = "shorthand", [attr.upper()]  # @bp.get / @app.post …
+                    else:
+                        continue
+                    rule = _up(dec.args[0]) if dec.args else ""
+                    for kw in dec.keywords:
+                        if kw.arg == "methods":
+                            ms = _methods_of(kw.value)
+                            if ms:
+                                methods = ms
+                    routes.append({
+                        "bp": owner,
+                        "url_prefix": bp_prefix(owner),
+                        "rule": rule,
+                        "methods": sorted(set(str(m).upper() for m in methods)),
+                        "endpoint": child.name,
+                        # v1.6.0：装饰器所修饰函数（即路由处理函数）的定义行号
+                        "lineno": getattr(child, "lineno", 0),
+                        "via": via,                            # v2.1.0
+                        "purpose": _doc_first(child),          # v2.1.0：docstring 首行
+                        "owner_is_param": owner in params,     # v2.1.0：注册器形态标志
+                        "registrar": src.get(owner),           # v2.1.0：引入 owner 形参的函数名
+                    })
+                _walk_funcs(child, params, src)
+                continue
+            _walk_funcs(child, outer_params, param_src)
+
+    _walk_funcs(tree, frozenset(), {})
+
+    # add_url_rule 形态：bp.add_url_rule('/x', 'endpoint', view_func) —— 非装饰器调用
     for node in ast.walk(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        if not isinstance(node, ast.Call):
             continue
-        for dec in node.decorator_list:
-            if not (isinstance(dec, ast.Call) and isinstance(dec.func, ast.Attribute)):
-                continue
-            if dec.func.attr != "route":
-                continue
-            if not isinstance(dec.func.value, ast.Name):
-                continue
-            owner = dec.func.value.id
-            rule = _up(dec.args[0]) if dec.args else ""
-            methods = ["GET"]
-            for kw in dec.keywords:
-                if kw.arg == "methods" and isinstance(kw.value, (ast.List, ast.Tuple)):
-                    methods = [ast.literal_eval(e) if isinstance(e, ast.Constant) else _up(e)
-                               for e in kw.value.elts]
-            routes.append({
-                "bp": owner,
-                "url_prefix": bp_prefix(owner),
-                "rule": rule,
-                "methods": sorted(set(str(m).upper() for m in methods)),
-                "endpoint": node.name,
-                # v1.6.0：装饰器所修饰函数（即路由处理函数）的定义行号
-                "lineno": getattr(node, "lineno", 0),
-            })
+        f = node.func
+        if not (isinstance(f, ast.Attribute) and f.attr == "add_url_rule"):
+            continue
+        if not isinstance(f.value, ast.Name):
+            continue
+        owner = f.value.id
+        rule, endpoint, methods = "", "", ["GET"]
+        if node.args and _is_str_const(node.args[0]):
+            rule = _up(node.args[0])
+        if len(node.args) >= 2 and _is_str_const(node.args[1]):
+            endpoint = node.args[1].value
+        if len(node.args) >= 3:
+            ms = _methods_of(node.args[2])
+            if ms:
+                methods = ms
+        for kw in node.keywords:                       # kw 形态参数统一取用
+            if kw.arg == "rule" and _is_str_const(kw.value):
+                rule = _up(kw.value)
+            elif kw.arg == "endpoint" and _is_str_const(kw.value):
+                endpoint = kw.value.value
+            elif kw.arg == "methods":
+                ms = _methods_of(kw.value)
+                if ms:
+                    methods = ms
+            elif kw.arg == "view_func":
+                if isinstance(kw.value, ast.Name):
+                    endpoint = endpoint or kw.value.id
+                elif isinstance(kw.value, ast.Attribute):
+                    endpoint = endpoint or kw.value.attr
+        routes.append({
+            "bp": owner,
+            "url_prefix": bp_prefix(owner),
+            "rule": rule,
+            "methods": sorted(set(methods)),
+            "endpoint": endpoint or f"<{rule.strip(chr(39))}>",
+            "lineno": getattr(node, "lineno", 0),
+            "via": "add_url_rule",
+            "purpose": None,
+            "owner_is_param": owner not in bp_vars and owner.endswith("bp"),
+            "registrar": None,
+        })
     return blueprints, routes
 
 
@@ -279,6 +392,32 @@ def _collect_call_sites(tree: ast.Module) -> list[dict]:
     return [{"caller": c, "target": t} for (c, t) in sorted(out)]
 
 
+def _collect_single_name_arg_calls(tree: ast.Module) -> list[dict]:
+    """收集「单 Name 位置参数」调用点：`f(x)`（无关键字参、无第二参）。
+
+    v2.1.0 端点归链专用：`register_fulltext_routes(veroscholar_bp)`、
+    `register_routes(bp)` 这类「把蓝图对象传入注册函数」的形态，仓库级
+    resolver 据此把形参路由绑定到实参蓝图。收集面刻意收窄（单参 + Name），
+    去重排序保证逐字节确定；上限 400 条/文件，防缓存膨胀。
+    """
+    out: set[tuple[str, str]] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if len(node.args) != 1 or node.keywords:
+            continue
+        arg = node.args[0]
+        if not isinstance(arg, ast.Name):
+            continue
+        tgt = _call_target(node.func)
+        if not tgt or tgt.startswith("<"):
+            continue
+        out.add((tgt, arg.id))
+        if len(out) >= 400:
+            break
+    return [{"f": f, "a": a} for (f, a) in sorted(out)]
+
+
 def parse_python_file(fpath: Path, rel: str, raw: bytes | None = None) -> dict:
     """解析单个 Python 文件，返回结构化摘要。
 
@@ -306,6 +445,7 @@ def parse_python_file(fpath: Path, rel: str, raw: bytes | None = None) -> dict:
         "imports": [],
         "import_facts": [],
         "calls": [],
+        "calls1": [],
         "classes": [],
         "functions": [],
         "blueprints": [],
@@ -329,6 +469,7 @@ def parse_python_file(fpath: Path, rel: str, raw: bytes | None = None) -> dict:
     result["imports"] = _collect_imports(tree)
     result["import_facts"] = _collect_import_facts(tree)
     result["calls"] = _collect_call_sites(tree)
+    result["calls1"] = _collect_single_name_arg_calls(tree)
     result["blueprints"], result["routes"] = _extract_routes(tree)
 
     for node in tree.body:  # 只取顶层，保持接口清单聚焦
@@ -410,6 +551,7 @@ def _failed_entry(rel: str, err: str) -> dict:
         "imports": [],
         "import_facts": [],
         "calls": [],
+        "calls1": [],
         "classes": [],
         "functions": [],
         "blueprints": [],

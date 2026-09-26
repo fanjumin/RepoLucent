@@ -41,6 +41,7 @@ from .gate import default_gates as gate_default_gates
 from .rules import run_rules
 from .core_analyzer import analyze_core
 from .plugin_analyzer import analyze_plugins
+from .endpoint_resolver import build_resolver
 from .interaction_analyzer import analyze_interactions
 from .standards_extractor import extract_standards
 from .deep_analyzer import analyze_target
@@ -104,10 +105,14 @@ def _render_deep_md(dd: dict) -> str:
         for fn in dd["functions"][:20]:
             w(f"- `{fn['name']}` {fn.get('signature', '')} — {fn['docstring'] or '—'}")
     if dd["routes"]:
-        w("\n## 路由明细（%d 条）\n\n| 端点 | 前缀 | 路径 | Method | 文件 |\n|---|---|---|---|---|" % dd["routes_count"])
+        w("\n## 路由明细（%d 条）\n\n| 端点 | 完整路径 | Method | 用途 | 归链 | 文件 |\n"
+          "|---|---|---|---|---|---|" % dd["routes_count"])
         for r in dd["routes"]:
-            w(f"| `{r['endpoint']}` | {r.get('url_prefix','')} | `{r['rule']}` | "
-              f"{','.join(r['methods'])} | {r['file']} |")
+            path = r.get("path") or (f"{r.get('url_prefix', '')}+{r['rule']}"
+                                     "（未归链/动态）")
+            w(f"| `{r['endpoint']}` | `{path}` | "
+              f"{','.join(r['methods'])} | {r.get('purpose') or '—'} | "
+              f"{r.get('resolution', '—')} | {r['file']} |")
     if dd.get("imports_aggregated"):
         w("\n## 导入聚合\n")
         for k, v in dd["imports_aggregated"].items():
@@ -155,6 +160,8 @@ def _summary_pairs(data: dict, duration_ms: int) -> list[tuple]:
         ("plugins_manifest_invalid",
          sum(1 for p in plugins["items"] if not p["manifest_valid"])),
         ("routes_total", sum(p["route_count"] for p in plugins["items"])),
+        ("routes_core", sum(m.get("route_count", 0) for m in core["modules"])
+         + sum(e.get("route_count", 0) for e in core.get("entry_files") or [])),
         ("boundary_violations",
          len(inter["boundary_observations"]["violations"])),
         ("files", ov["total_files"]),
@@ -748,6 +755,15 @@ def _analyze_compute(args, cfg: RepoConfig,
     overview = scan_overview(cfg, parse_cache)
     core = analyze_core(cfg, parse_cache)
     plugins = analyze_plugins(cfg, parse_cache)
+    # ---- 端点归链（v2.1.0）：仓库级前缀归链，给路由事实就地补
+    # prefix/path/bp_name/resolution 四字段（纯新增，消费方忽略未知字段即兼容）----
+    ep_resolver = build_resolver(cfg, parse_cache)
+    for _m in core.get("modules") or []:
+        ep_resolver.enrich(_m.get("routes") or [])
+    for _p in plugins.get("items") or []:
+        ep_resolver.enrich(_p.get("routes") or [])
+    for _e in core.get("entry_files") or []:
+        ep_resolver.enrich(_e.get("routes") or [])
     interactions = analyze_interactions(cfg, parse_cache, core, plugins)
     standards = extract_standards(cfg, plugins)
 
@@ -783,6 +799,8 @@ def _analyze_compute(args, cfg: RepoConfig,
     if deep and cfg.target:
         data["deep_dive"] = analyze_target(cfg, cfg.target_type, cfg.target,
                                            parse_cache, plugins)
+        # 深钻路由与聚合路由同一归链口径（v2.1.0 端点全景）
+        ep_resolver.enrich((data["deep_dive"] or {}).get("routes") or [])
 
     # ---- 符号倒排索引（v1.6.0 阶段一 1-C）----
     # 复用本次 parse_cache 的逐文件事实，零新增解析成本。

@@ -148,6 +148,11 @@ def analyze_core(cfg: RepoConfig, parse_cache: dict) -> dict:
                 "file": str(rel),
                 "docstring": entry["docstring"],
                 "loc": entry["loc_total"],
+                # v2.1.0 端点全景：根级入口脚本（如 VeroRun auth_server.py）的
+                # 路由也是端点事实；此前仅目录型核心模块收集路由，根级 app.route
+                # 整体缺失（"统计不完整"的最后一个来源）。
+                "routes": [{**r, "file": str(rel)} for r in entry["routes"]],
+                "route_count": len(entry["routes"]),
             })
     entry_files.sort(key=lambda e: -e["loc"])
 

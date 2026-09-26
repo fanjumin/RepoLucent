@@ -82,6 +82,46 @@ TOOL_VERSION 与产物解耦，任意变更都可递增。
   §5 `profile` 全章重写（声明通道与失败语义 / profile v2 字段全表 / 三预设 / 边界 / 与旧版等效性）；
   §7.1 预设解析说明同步。
 
+## [2.1.0] - 2026-09-26
+
+端点全景归链（Electron 接线数据源）：把「逐路由可复现的完整端点目录」上收为工具事实。
+`SCHEMA_VERSION` 1.4→1.5（纯 MINOR 新增可选字段），`TOOL_VERSION` 2.0.0→2.1.0。
+
+### Added
+- **`endpoint_resolver.py`（新模块）**：仓库级前缀归链，给每条路由就地补
+  `prefix / path / bp_name / resolution`。`resolution` 是证据等级（8 态：
+  blueprint / noprefix / imported / registrar / app / default / nonliteral /
+  unresolved），静态不可定的一律诚实标注，绝不产出猜测路径。覆盖三类单文件
+  解析器看不穿的形态：跨文件 `from .x import bp`（含包 `__init__` 多跳再导出）、
+  `register_routes(bp)` 注册器调用点实参归链、框架兜底前缀约定。
+- **`py_ast.py` 采集面扩展**：`@bp.get/.post` 等简写装饰器、`add_url_rule` 调用、
+  路由处理函数 docstring（`purpose`）、注册器形态标志（`owner_is_param` /
+  `registrar`，作用域递归下传形参归属）、单 Name 实参调用点事实（`calls1`）。
+  既有字段语义与取值格式零改动；AST 缓存 entry 结构变化 → `CACHE_VERSION` 4→5。
+- **profile 新段 `endpoints.default_plugin_prefix`**：框架兜底前缀约定（如
+  VeroRun `/plugin/{identifier}`）只由 profile 承载，未声明的项目零影响。
+- `core.entry_files` 补采根级入口脚本（如 `auth_server.py`）的路由
+  （`routes` / `route_count`）；摘要新增 `routes_core` 行。
+- CLI 深钻「路由明细」表升级为 端点｜完整路径｜Method｜用途｜归链｜文件 六列；
+  报告 md 端点清单路径优先；`index_db` routes 表加 `path` 列。
+- 单测 `tests/unit/test_endpoint_resolver.py` 13 例（8 种 resolution 形态全覆盖）。
+
+### Changed
+- `max_routes_per_plugin` 默认 60→120：明细截断本身即「统计不完整」成员，
+  实测 VeroRun 最大单插件 80 条不再被切。
+- `index_db.load_rows()` 新增 `tool_version` 一致性判定：仓库未变但加速库由旧版
+  工具所建时自动回退全量分析重建，杜绝旧 payload 吞掉新字段。
+
+### 验收（真实 VeroRun 实跑）
+- 1590 条路由明细归链 100%（unresolved=0）；7 个最难点逐条命中
+  （coupons 兜底前缀 / site_analyzer 函数内 import+直调 / veroscholar 两跳
+  包再导出 / auth-center 分片 118 条 imported 链等）。
+- 与人工核对基线双向差集逐条核源定性：零真实漏采（差异均为空 rule 尾斜杠
+  两写法与我早期脚本笔误，工具按源码判对）。
+- 单测 104/104 绿；golden 全绿（重录）；`_run_regress` 25/26
+  （唯一失败 `verify_llm::degrade_missing_key_env` 经 stash 在未改动 HEAD 上
+  复现，为环境预置问题，与本版本无关）。
+
 ## [2.0.0] - 2026-09-13
 
 阶段 F 收口：规则引擎（`repo_lucent/rules/`），完成《repolucent升级实施方案 v1.5.1→v2.0.0》的最后一关，工具抵达 2.0.0 里程碑。

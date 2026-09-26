@@ -13,7 +13,7 @@
 """
 
 TOOL_NAME = "repolucent"
-TOOL_VERSION = "2.0.0"
+TOOL_VERSION = "2.1.0"
 
 #: 产物 schema 版本（MAJOR.MINOR）—— 供人与 Agent 共同遵守的兼容契约。
 #:
@@ -38,7 +38,11 @@ TOOL_VERSION = "2.0.0"
 #:       findings（schema_version / summary / items），由 repo_lucent/rules/
 #:       包只读派生（SPEC / SEC / ARCH / CMP 四类 15 条规则），不修改任何
 #:       analyzer 产物；info 级不计入门禁，符合 --deterministic 可复现性。
-SCHEMA_VERSION = "1.4"
+#:   1.5 端点归链字段（MINOR，v2.1.0）：路由条目新增 prefix / path / bp_name /
+#:       resolution（8 种归链证据态）与 via / purpose / owner_is_param /
+#:       registrar；core.entry_files 条目新增 routes / route_count（根级入口
+#:       脚本路由补采）；摘要新增 routes_core 行。消费方忽略未知字段即兼容。
+SCHEMA_VERSION = "1.5"
 
 #: 产物文件名常量（单一事实源）：更名六件套（v2.0.0）时集中改动此处。
 ARTIFACT_JSON = "repo_lucent.json"

@@ -41,7 +41,10 @@ HASH_LEN = 12
 #:              旧的「仅签名」记录无法参与哈希比对，故整体失效重建。
 #: v2.x → 4：entry 新增 import_facts / calls 两字段（函数级依赖图用），
 #:              旧缓存缺该字段会让 dep_graph 丢边，故整体失效重建。
-CACHE_VERSION = 4
+#: v2.1.0 → 5：routes 新增 via/purpose/owner_is_param、blueprint 新增 prefix_literal、
+#:              entry 新增 calls1（端点归链用），旧缓存会让 endpoint_resolver 漏采
+#:              简写/注册器形态，故整体失效重建。
+CACHE_VERSION = 5
 
 
 #: 单文件缓存判定结果。

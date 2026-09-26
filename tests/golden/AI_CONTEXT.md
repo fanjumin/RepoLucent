@@ -1,6 +1,6 @@
 # 仓库开发上下文（RepoLucent 自动生成）
 
-> 生成：RepoLucent v2.0.0 · None · 仓库 `fixture_repo`
+> 生成：RepoLucent v2.1.0 · None · 仓库 `fixture_repo`
 > 用途：把本文件作为 AI 助手的上下文，代替通读仓库源码。开发前只需提供本文件。
 
 ## 1. 系统架构（系统核心 = 平台引擎；业务插件 = 可插拔能力）

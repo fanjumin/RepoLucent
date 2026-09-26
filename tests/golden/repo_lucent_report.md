@@ -1,6 +1,6 @@
 # 仓库架构洞察报告（RepoLucent）
 
-> 由 RepoLucent v2.0.0 自动生成 · None · 仓库 `fixture_repo` · 耗时 None ms
+> 由 RepoLucent v2.1.0 自动生成 · None · 仓库 `fixture_repo` · 耗时 None ms
 
 ## 1. 总览
 
@@ -10,45 +10,46 @@
 | 业务插件（已识别） | 2 个 |
 | Python 文件 | 13 个（全仓文本文件口径） |
 | 代码行 | 53 行 / 总 60 行 |
+| 字节量 | 1,872 字节（≈1.8 KB）· 其中代码 1,528 字节（≈1.5 KB） |
 | 插件路由总数 | 2 条 |
 | manifest 校验失败插件 | 1 个 |
 | 核心边界观察项 | 0 个 |
 | 资产文件（md/yml/json 等，不计代码行） | 3 个 |
 
-> 统计口径：代码行统计口径：真实代码扩展名 (.py/.js/.ts/.vue/.html/.css/.sh/.sql)；已排除 docs/ 目录、根目录本地调试脚本、临时文件；.md/.yml/.json 等文档/文案仅计入资产文件数，不计代码行。
+> 统计口径：代码行统计口径：真实代码扩展名 (.py/.js/.ts/.vue/.html/.css/.sh/.sql)；已排除 docs/ 目录、根目录本地调试脚本、临时文件；.md/.yml/.json 等文档/文案仅计入资产文件数，不计代码行。字节量为文件物理体积（st_size），与行数口径解耦，仅供体量参考。
 
 ### 1.1 代码量统计
 
 **按语言/扩展名（代码量 TOP）**
 
-| 类型 | 代码行 | 文件数 |
-|---|---:|---:|
-| `.py` | 53 | 10 |
+| 类型 | 代码行 | 文件数 | 字节量 |
+|---|---:|---:|---:|
+| `.py` | 53 | 10 | 1,528（1.5 KB） |
 
 **按顶层目录（代码量 TOP）**
 
-| 目录 | 代码行 | 总行 | 文件 |
-|---|---:|---:|---:|
-| `plugin_manager` | 31 | 34 | 3 |
-| `plugins` | 18 | 22 | 7 |
-| `i18n` | 2 | 2 | 1 |
-| `shared` | 2 | 2 | 1 |
-| `<root>` | 0 | 0 | 1 |
+| 目录 | 代码行 | 总行 | 文件 | 字节量 |
+|---|---:|---:|---:|---:|
+| `plugin_manager` | 31 | 34 | 3 | 942（942 B） |
+| `plugins` | 18 | 22 | 7 | 800（800 B） |
+| `i18n` | 2 | 2 | 1 | 25（25 B） |
+| `shared` | 2 | 2 | 1 | 32（32 B） |
+| `<root>` | 0 | 0 | 1 | 73（73 B） |
 
 **代码量最大文件 TOP 10**
 
-| 文件 | 代码行 | 总行 |
-|---|---:|---:|
-| `plugin_manager\base.py` | 19 | 21 |
-| `plugins\demo\routes.py` | 8 | 10 |
-| `plugin_manager\discovery.py` | 7 | 7 |
-| `plugins\demo\__init__.py` | 6 | 7 |
-| `plugin_manager\manager.py` | 5 | 6 |
-| `i18n\__init__.py` | 2 | 2 |
-| `plugins\_base\db.py` | 2 | 2 |
-| `plugins\bad\__init__.py` | 2 | 2 |
-| `shared\__init__.py` | 2 | 2 |
-| `plugins\__init__.py` | 0 | 1 |
+| 文件 | 代码行 | 总行 | 字节量 |
+|---|---:|---:|---:|
+| `plugin_manager\base.py` | 19 | 21 | 570（570 B） |
+| `plugins\demo\routes.py` | 8 | 10 | 242（242 B） |
+| `plugin_manager\discovery.py` | 7 | 7 | 200（200 B） |
+| `plugins\demo\__init__.py` | 6 | 7 | 183（183 B） |
+| `plugin_manager\manager.py` | 5 | 6 | 172（172 B） |
+| `i18n\__init__.py` | 2 | 2 | 25（25 B） |
+| `plugins\_base\db.py` | 2 | 2 | 47（47 B） |
+| `plugins\bad\__init__.py` | 2 | 2 | 28（28 B） |
+| `shared\__init__.py` | 2 | 2 | 32（32 B） |
+| `AGENTS.md` | 0 | 0 | 73（73 B） |
 
 ## 2. 目录结构（深度 2）
 

@@ -133,6 +133,10 @@
       "route_prefix_pattern": "/admin/{identifier}"
     },
 
+    "endpoints": {
+      "default_plugin_prefix": "/plugin/{identifier}"
+    },
+
     "packs": { "enabled": ["gitflow", "verorun"] },
 
     "branding": {

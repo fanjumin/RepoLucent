@@ -11,7 +11,7 @@ index.db 之后，只要库存在且新鲜，``query`` 可取行后直接返回 
 表结构（方案 §3-B 的四表 + 一张必要的行存储补充）::
 
     plugins(identifier, version, agent_role, routes, payload)
-    routes(rule, methods, plugin, file, lineno)
+    routes(rule, methods, plugin, file, lineno, path)
     symbols(name, kind, file, line, owner)
     files(relpath, loc, lang, plugin)
     core_modules(module, payload)     # core scope 的行存储（四表外的必要补充）
@@ -31,6 +31,8 @@ import sqlite3
 import time
 from pathlib import Path
 
+from . import TOOL_VERSION
+
 #: 库文件名（落在 cfg.cache_dir）
 DB_NAME = "index.db"
 
@@ -43,7 +45,8 @@ CREATE TABLE IF NOT EXISTS plugins(
     identifier TEXT PRIMARY KEY, version TEXT, agent_role TEXT,
     routes INTEGER, payload TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS routes(
-    rule TEXT, methods TEXT, plugin TEXT, file TEXT, lineno INTEGER);
+    rule TEXT, methods TEXT, plugin TEXT, file TEXT, lineno INTEGER,
+    path TEXT);
 CREATE TABLE IF NOT EXISTS symbols(
     name TEXT, kind TEXT, file TEXT, line INTEGER, owner TEXT);
 CREATE TABLE IF NOT EXISTS files(
@@ -162,6 +165,8 @@ def build(cfg, data: dict, symbols: dict | None = None) -> Path | None:
             conn.execute("INSERT OR REPLACE INTO meta VALUES(?,?)",
                          ("fingerprint", repo_fingerprint(cfg)))
             conn.execute("INSERT OR REPLACE INTO meta VALUES(?,?)",
+                         ("tool_version", TOOL_VERSION))
+            conn.execute("INSERT OR REPLACE INTO meta VALUES(?,?)",
                          ("built_at", str(int(time.time()))))
             conn.execute("INSERT OR REPLACE INTO meta VALUES(?,?)",
                          ("tables", ",".join(("plugins", "routes", "symbols",
@@ -198,10 +203,11 @@ def _fill(conn: sqlite3.Connection, cfg, data: dict,
         for rt in (p.get("routes") or []):
             if isinstance(rt, dict):
                 conn.execute(
-                    "INSERT INTO routes(rule, methods, plugin, file, lineno)"
-                    " VALUES(?,?,?,?,?)",
+                    "INSERT INTO routes(rule, methods, plugin, file, lineno, path)"
+                    " VALUES(?,?,?,?,?,?)",
                     (rt.get("rule"), _dumps(rt.get("methods") or []), ident,
-                     rt.get("file") or p.get("dir"), rt.get("lineno")))
+                     rt.get("file") or p.get("dir"), rt.get("lineno"),
+                     rt.get("path")))
 
     for m in ((data.get("core") or {}).get("modules") or []):
         # core 模块行的主键字段是 name（非 module）
@@ -241,6 +247,11 @@ def load_rows(cfg, scope: str) -> list[dict] | None:
         row = conn.execute("SELECT value FROM meta WHERE key='fingerprint'").fetchone()
         if not row or row[0] != repo_fingerprint(cfg):
             return None                                  # 过期：回退全量分析
+        tv = conn.execute("SELECT value FROM meta WHERE key='tool_version'").fetchone()
+        if not tv or tv[0] != TOOL_VERSION:
+            # 工具升级后 payload 形态可能演进（如 v2.1.0 端点归链字段）；
+            # 仓库未变但库是旧工具所建 → 视为过期回退，由全量分析重建。
+            return None
         return [json.loads(r[0]) for r in
                 conn.execute(f"SELECT payload FROM {table}")]     # noqa: S608
     except (sqlite3.Error, ValueError, OSError):

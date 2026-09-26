@@ -136,6 +136,12 @@ GATE_RULES: list | None = None
 #: None = 该 profile 无此惯例 → route-unprefixed 检查项自动跳过（而非误判失败）。
 ROUTE_PREFIX_PATTERN: str | None = None
 
+#: 端点归链兜底前缀 = profile.endpoints.default_plugin_prefix（v2.1.0，
+#: 如 "/plugin/{identifier}"——VeroRun 插件管理器 _get_route_prefix 同款语义：
+#: 组件目录下蓝图未声明 url_prefix 时框架挂载会自动补前缀）。
+#: None = 未启用该约定 → 无前缀蓝图按根路径直连（通用 Flask 语义），绝不臆测。
+ENDPOINT_DEFAULT_PLUGIN_PREFIX: str | None = None
+
 #: 品牌（仪表盘标题 / 产物文件名前缀）= profile.branding；缺省为中性通用值，
 #: 使"未声明 branding 的项目"也能得到不像任何具体项目的标题与文件名。
 _DEFAULT_BRANDING: dict[str, str] = {
@@ -176,6 +182,7 @@ def apply_profile() -> str:
     global AUTO_CORE_EXCLUDE, DEFAULT_EXCLUDE_DIRS, ROOT_ENTRY_ALLOWLIST
     global KEY_DOCS, PLUGIN_STANDARD_RE, PLUGIN_SYSTEM, REPORT_SECTIONS
     global GATE_RULES, ROUTE_PREFIX_PATTERN, BRANDING
+    global ENDPOINT_DEFAULT_PLUGIN_PREFIX
 
     from .settings import profile_get, require_profile
     name, _prof = require_profile()          # 未声明/非法 → ProfileNotDeclared
@@ -233,6 +240,12 @@ def apply_profile() -> str:
     GATE_RULES = ([str(x) for x in _rules if x] if isinstance(_rules, list) else None)
     _pat = _gates.get("route_prefix_pattern", None)
     ROUTE_PREFIX_PATTERN = str(_pat) if _pat else None
+
+    # 端点归链约定（v2.1.0）：无条件赋值，profile 切换不残留。
+    _ep = profile_get("endpoints", None)
+    _ep = _ep if isinstance(_ep, dict) else {}
+    _dpp = _ep.get("default_plugin_prefix", None)
+    ENDPOINT_DEFAULT_PLUGIN_PREFIX = str(_dpp) if _dpp else None
 
     _br = profile_get("branding", None)
     _br = _br if isinstance(_br, dict) else {}
@@ -427,7 +440,9 @@ class RepoConfig:
     out_dir: Path
     exclude_dirs: set = field(default_factory=lambda: set(DEFAULT_EXCLUDE_DIRS))
     max_tree_depth: int = 2                 # 目录树展示深度
-    max_routes_per_plugin: int = 60         # 每插件路由明细上限（防 JSON 膨胀）
+    max_routes_per_plugin: int = 120        # 每插件路由明细上限（防 JSON 膨胀；
+    #                                        v2.1.0 60→120：端点接线要求明细完整，
+    #                                        实测 VeroRun 最大单插件 80 条不再被截）
     max_funcs_per_module: int = 40          # 每核心模块函数列表上限
     max_classes_per_module: int = 40        # 每核心模块类列表上限
     max_methods_per_class: int = 30         # 每类方法列表上限

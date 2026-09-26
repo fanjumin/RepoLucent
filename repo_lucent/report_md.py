@@ -350,7 +350,7 @@ def render_md(data: dict) -> str:
         if dd.get("routes") and dd["routes_count"] > 0:
             w("")
             w(f"路由明细（前 20/{dd['routes_count']}）：`" + "`, `".join(
-                r['endpoint'] for r in dd['routes'][:20]) + "`")
+                (r.get("path") or r['endpoint']) for r in dd['routes'][:20]) + "`")
         w("")
 
     findings = data.get("findings") or {}

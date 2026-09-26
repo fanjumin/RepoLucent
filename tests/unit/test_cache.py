@@ -185,9 +185,10 @@ def test_load_non_dict_entries(tmp_path):
     assert load(tmp_path) == {}
 
 
-def test_cache_version_is_four():
-    """依赖图在 entry 新增 import_facts / calls 两字段 → CACHE_VERSION 必须为 4。"""
-    assert CACHE_VERSION == 4
+def test_cache_version_is_five():
+    """v2.1.0 端点全景：routes/via/purpose/owner_is_param + calls1 进 entry
+    → 旧缓存会让 endpoint_resolver 漏采简写/注册器形态，CACHE_VERSION 必须为 5。"""
+    assert CACHE_VERSION == 5
 
 
 def test_end_to_end_touch_then_hit(tmp_path):
